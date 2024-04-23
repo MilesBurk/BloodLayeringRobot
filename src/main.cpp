@@ -32,6 +32,8 @@
 #define pumpPin 14
 #define pumpMicrosteps 16
 
+#define volumeSensingPin 23
+
 hw_timer_t * timer = NULL;      //H/W timer defining (Pointer to the Structure)
 volatile bool pinState = false;
 volatile bool isPumpOn = false;
@@ -50,6 +52,7 @@ int sweepToAngle(int angle, float time_s, int motorNum, int offset_deg);
 void sweep(int delay_ms,int motorNum);
 
 void stopAllMotors();
+void stopPump();
 void performFillingMotion();
 void onTimer();
 void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
@@ -71,8 +74,12 @@ void setup() {
   //Initialize pump pin
   pinMode(pumpPin, OUTPUT);
 
+  pinMode(volumeSensingPin, INPUT);
+
   //Add external interupt for emergency stop button  
   attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
+
+  attachInterrupt(digitalPinToInterrupt(volumeSensingPin), stopPump, FALLING);
 
   //Initialize PWM for servo driver
   pwm.begin();
@@ -92,20 +99,10 @@ void loop() {
   if (digitalRead(runButton) == HIGH)
   {
     //Adding this line to the test branch
-    //performFillingMotion();
+    performFillingMotion();
 
-    //ADD PUMPING SEQUENCE HERE
-    setPumpRPM(3, pumpPin, pumpMicrosteps);
-    delay(10000);
-    setPumpRPM(5, pumpPin, pumpMicrosteps);
-    delay(60000);
-    setPumpRPM(7, pumpPin, pumpMicrosteps);
-    delay(30000);
-    setPumpRPM(10, pumpPin, pumpMicrosteps);
-    delay(30000);
-    setPumpRPM(15, pumpPin, pumpMicrosteps);
-    delay(30000);
-    setPumpRPM(0, pumpPin, pumpMicrosteps);
+
+
   }
 }
 
@@ -207,27 +204,64 @@ void performFillingMotion(){
   servo1Pos = goToAngle(0, tube1, tube1_Offset);
   delay(1000);
   //go to center above the tube.
-  Gantry.goToAbsPosition_mm(0, 22, Gantry.getMaxZDisplacement() - 10, 5);
-  
-  //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
-  
-  int firstFillAngle = 70;
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
+  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
 
+  //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
+  int firstFillAngle = 60;
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
+  
   int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
-  int intialHeightAboveAxis = 44000;
+  int intialHeightAboveAxis = 47000;
   Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
   servo1Pos = sweepToAngle(firstFillAngle, 2, tube1, tube1_Offset);
   delay(1000);
-
-  int entranceDistance_um = 30000;
+ 
+  int entranceDistance_um = 55000;
   //slide into tube very slowly
-  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*firstFillAngle/float(180)), -entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
 
+
+
+  
+    //ADD PUMPING SEQUENCE HERE
+  setPumpRPM(3, pumpPin, pumpMicrosteps);
+  /*
+    delay(10000);
+  setPumpRPM(5, pumpPin, pumpMicrosteps);
+  delay(60000);
+  setPumpRPM(7, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(15, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
+  */
+
+
+  
   delay(2000);
   //travel back up tube to the top
-  entranceDistance_um = 20000;
+  entranceDistance_um = 45000;
   Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+
+
+//take the nozzle out
+  Gantry.goToRelativePosition(0, 0, 40000, 5000);
+
+  // straighten out tube
+  servo1Pos = sweepToAngle(-1, 4, tube1, tube1_Offset);
+
+  //go to center above the tube
+  // note: 47000 zoffset from center position
+  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
+
+  //take the nozzle to tube wall
+  Gantry.goToRelativePosition(0, -tubeWidth_mm*1000/2, -(47000-35000), 5000);
+
+
+ 
+
 }
 
 void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep){
@@ -251,4 +285,8 @@ void onTimer(){
     pinState = !pinState;
     digitalWrite(pumpPin, -pinState);
   }
+}
+
+void stopPump(){
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
 }

@@ -66,7 +66,7 @@ void sweep(int delay_ms,int motorNum);
 
 void stopAllMotors();
 void stopPump();
-void performFillingMotion();
+void performFillingMotionforAll4();
 void onTimer();
 void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
 
@@ -132,7 +132,7 @@ void loop() {
   if (digitalRead(runButton) == HIGH)
   {
     //Adding this line to the test branch
-    performFillingMotion();
+    performFillingMotionforAll4();
   
 
 
@@ -234,7 +234,7 @@ void sweep(int delay_ms,int motorNum){
   delay(1000);
 }
 
-void performFillingMotion(){
+void performFillingMotionforAll4(){
 
 /*
   int testTube = 0;

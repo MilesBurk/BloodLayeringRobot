@@ -38,7 +38,6 @@ hw_timer_t * timer = NULL;      //H/W timer defining (Pointer to the Structure)
 volatile bool pinState = false;
 volatile bool isPumpOn = false;
 
-
 gantry Gantry = gantry();
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
@@ -96,9 +95,9 @@ void loop() {
   if(digitalRead(homeButton) == HIGH){
     Gantry.homeGantry();
     servo1Pos = goToAngle(-30, tube1, tube1_Offset);
-    servo1Pos = goToAngle(-30, tube2, tube2_Offset);
-    servo1Pos = goToAngle(-30, tube3, tube3_Offset);
-    servo1Pos = goToAngle(-30, tube4, tube4_Offset);
+    //servo1Pos = goToAngle(-30, tube2, tube2_Offset);
+    //servo1Pos = goToAngle(-30, tube3, tube3_Offset);
+    //servo1Pos = goToAngle(-30, tube4, tube4_Offset);
   }
   if (digitalRead(runButton) == HIGH)
   {
@@ -207,9 +206,9 @@ void sweep(int delay_ms,int motorNum){
 
 void performFillingMotion(){
   servo1Pos = goToAngle(0, tube1, tube1_Offset);
-  servo1Pos = goToAngle(0, tube2, tube2_Offset);
-  servo1Pos = goToAngle(0, tube3, tube3_Offset);
-  servo1Pos = goToAngle(0, tube4, tube4_Offset);
+  //servo1Pos = goToAngle(0, tube2, tube2_Offset);
+  //servo1Pos = goToAngle(0, tube3, tube3_Offset);
+  //servo1Pos = goToAngle(0, tube4, tube4_Offset);
 
   delay(1000);
   //go to center above the tube.
@@ -240,9 +239,6 @@ void performFillingMotion(){
   //slide into tube very slowly
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
 
-
-
-  
     //ADD PUMPING SEQUENCE HERE
   setPumpRPM(3, pumpPin, pumpMicrosteps);
   delay(10000);
@@ -271,17 +267,19 @@ void performFillingMotion(){
 //take the nozzle out
   Gantry.goToRelativePosition(0, 0, 40000, 5000);
 
-  // straighten out tube
-  servo1Pos = sweepToAngle(-10, 6, tube1, tube1_Offset);
+  // straighten out 
+  int finalFillAngle = -10;
+  servo1Pos = sweepToAngle(finalFillAngle, 6, tube1, tube1_Offset);
 
   //go to center above the tube
   // note: 47000 zoffset from center position
   Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
 
-  //take the nozzle to tube wall
-  Gantry.goToRelativePosition(0, -tubeWidth_mm*1000/2-5500, -(47000-35000), 5000);
 
- 
+  int depthBelowTubeTop_um = 15000;
+  //take the nozzle to tube wall
+  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
+
 
 }
 

@@ -21,7 +21,12 @@ class gantry{
     void goToRelativePosition(int x, int y, int z, int time_ms);
     void emergencyStop();
     int getMaxZDisplacement();
+    int getMaxYDisplacement();
+    int getMaxXDisplacement();
 
+    int getXDisplacement_um();
+
+    bool isGantryHomed();
     //To be completed Later for enabeling and dissabling
     void powerDown();
     void powerUp();

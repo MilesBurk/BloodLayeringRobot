@@ -95,11 +95,16 @@ void setup() {
 void loop() {
   if(digitalRead(homeButton) == HIGH){
     Gantry.homeGantry();
+    servo1Pos = goToAngle(-30, tube1, tube1_Offset);
+    servo1Pos = goToAngle(-30, tube2, tube2_Offset);
+    servo1Pos = goToAngle(-30, tube3, tube3_Offset);
+    servo1Pos = goToAngle(-30, tube4, tube4_Offset);
   }
   if (digitalRead(runButton) == HIGH)
   {
     //Adding this line to the test branch
     performFillingMotion();
+  
 
 
 
@@ -202,10 +207,25 @@ void sweep(int delay_ms,int motorNum){
 
 void performFillingMotion(){
   servo1Pos = goToAngle(0, tube1, tube1_Offset);
+  servo1Pos = goToAngle(0, tube2, tube2_Offset);
+  servo1Pos = goToAngle(0, tube3, tube3_Offset);
+  servo1Pos = goToAngle(0, tube4, tube4_Offset);
+
   delay(1000);
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
-
+  
+  //initizl pump prime
+  //setPumpRPM(300, pumpPin, pumpMicrosteps);
+  //delay(1900);
+  
+  //test
+  /*
+  setPumpRPM(40, pumpPin, pumpMicrosteps);
+  delay(60000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
+  */
+ 
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
   Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
@@ -213,10 +233,10 @@ void performFillingMotion(){
   int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
   int intialHeightAboveAxis = 47000;
   Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
-  servo1Pos = sweepToAngle(firstFillAngle, 2, tube1, tube1_Offset);
+  servo1Pos = sweepToAngle(firstFillAngle, 1, tube1, tube1_Offset);
   delay(1000);
  
-  int entranceDistance_um = 55000;
+  int entranceDistance_um = 60000;
   //slide into tube very slowly
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
 
@@ -225,6 +245,8 @@ void performFillingMotion(){
   
     //ADD PUMPING SEQUENCE HERE
   setPumpRPM(3, pumpPin, pumpMicrosteps);
+  delay(10000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
   /*
     delay(10000);
   setPumpRPM(5, pumpPin, pumpMicrosteps);
@@ -250,15 +272,14 @@ void performFillingMotion(){
   Gantry.goToRelativePosition(0, 0, 40000, 5000);
 
   // straighten out tube
-  servo1Pos = sweepToAngle(-1, 4, tube1, tube1_Offset);
+  servo1Pos = sweepToAngle(-10, 6, tube1, tube1_Offset);
 
   //go to center above the tube
   // note: 47000 zoffset from center position
   Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
 
   //take the nozzle to tube wall
-  Gantry.goToRelativePosition(0, -tubeWidth_mm*1000/2, -(47000-35000), 5000);
-
+  Gantry.goToRelativePosition(0, -tubeWidth_mm*1000/2-5500, -(47000-35000), 5000);
 
  
 

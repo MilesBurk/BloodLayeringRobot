@@ -46,6 +46,7 @@ class ballScrew {
     int getStepPin();
     int getLinearSteps(int length_um);
     void updateDisplacement();
+    int getDisplacement_um();
     void emergencyStopMotor();
     unsigned long  getMinimumTimeToCompleteSteps(unsigned long desiredTime_ms);
     void setPulseDelay_us(int delayUs);

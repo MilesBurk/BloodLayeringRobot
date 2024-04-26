@@ -82,6 +82,11 @@ void ballScrew::updateDisplacement(){
     displacement_um = totalSteps*(pitch_mm*1000)/stepsPerRevolution;
 }
 
+int ballScrew::getDisplacement_um(){
+    return displacement_um;
+}
+
+
 void ballScrew::setStepDelays(unsigned long totalTime_us){
     
     if(remainingSteps != 0){

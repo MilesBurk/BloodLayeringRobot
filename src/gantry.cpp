@@ -65,6 +65,23 @@ int gantry::getMaxZDisplacement(){
   return ZmaxDisplacementFrom0_mm;
 }
 
+int gantry::getMaxYDisplacement(){
+  return YmaxDisplacementFrom0_mm;
+}
+
+int gantry::getMaxXDisplacement(){
+  return XmaxDisplacementFrom0_mm;
+}
+
+int gantry::getXDisplacement_um(){
+  return axis[0].getDisplacement_um();
+}
+
+bool gantry::isGantryHomed(){
+  return isHomed;
+}
+
+
 void gantry::emergencyStop(){
     isEmergencyStopped = true;
     isHomed = false;

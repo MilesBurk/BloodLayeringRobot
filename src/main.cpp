@@ -55,6 +55,7 @@ int startingZ_mm  = Gantry.getMaxZDisplacement() - 50;
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
+int servo1Pos = 0;
 
 int servoPos_pulse[4] = {0, 0, 0, 0};
 int tubePins[4] = {tube1, tube2, tube3, tube4};
@@ -67,6 +68,7 @@ void sweep(int delay_ms,int motorNum);
 void stopAllMotors();
 void stopPump();
 void performFillingMotionforAll4();
+void performFillingMotionFor1Tube();
 void onTimer();
 void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
 
@@ -132,8 +134,10 @@ void loop() {
   if (digitalRead(runButton) == HIGH)
   {
     //Adding this line to the test branch
-    performFillingMotionforAll4();
-  
+
+    
+    //performFillingMotionforAll4();
+  performFillingMotionFor1Tube();
 
 
 
@@ -359,4 +363,79 @@ void onTimer(){
 
 void stopPump(){
   setPumpRPM(0, pumpPin, pumpMicrosteps);
+}
+
+
+
+
+void performFillingMotionFor1Tube(){
+  servo1Pos = goToAngle(0, tube1, tube1_Offset);
+
+
+  delay(1000);
+  //go to center above the tube.
+  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
+   
+  //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
+  int firstFillAngle = 60;
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
+  
+  int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
+  int intialHeightAboveAxis = 47000;
+  Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+  servo1Pos = sweepToAngle(firstFillAngle, 1, tube1, tube1_Offset, servo1Pos);
+  delay(1000);
+ 
+  int entranceDistance_um = 60000;
+  //slide into tube very slowly
+  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
+    //initizl pump prime
+  setPumpRPM(300, pumpPin, pumpMicrosteps);
+  delay(1900);
+  
+    //ADD PUMPING SEQUENCE HERE
+  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  //delay(3*60000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
+
+  entranceDistance_um = 15000;
+  Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+
+  /*
+    delay(10000);
+  setPumpRPM(5, pumpPin, pumpMicrosteps);
+  delay(60000);
+  setPumpRPM(7, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(15, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
+  */
+
+  delay(2000);
+  //travel back up tube to the top
+  entranceDistance_um = 30000;
+  Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+
+//take the nozzle out
+  Gantry.goToRelativePosition(0, 0, 40000, 5000);
+
+  // straighten out 
+  int finalFillAngle = -10;
+  servo1Pos = sweepToAngle(finalFillAngle, 6, tube1, tube1_Offset, servo1Pos);
+
+  //go to center above the tube
+  // note: 47000 zoffset from center position
+  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
+
+
+  int depthBelowTubeTop_um = 15000;
+  //take the nozzle to tube wall
+  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
+  
+  setPumpRPM(50, pumpPin, pumpMicrosteps);
+  delay(10000);
+
 }

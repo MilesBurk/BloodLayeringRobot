@@ -374,7 +374,7 @@ void performFillingMotionFor1Tube(){
 
   delay(1000);
   //go to center above the tube.
-  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
+  Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
    
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
@@ -428,7 +428,7 @@ void performFillingMotionFor1Tube(){
 
   //go to center above the tube
   // note: 47000 zoffset from center position
-  Gantry.goToAbsPosition_mm(0, 67, Gantry.getMaxZDisplacement() - 50, 5);
+  Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
 
 
   int depthBelowTubeTop_um = 15000;

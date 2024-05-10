@@ -17,7 +17,7 @@
 #define zPitch_mm 2
 #define XmaxDisplacementFrom0_mm 285
 #define YmaxDisplacementFrom0_mm 140
-#define ZmaxDisplacementFrom0_mm 180
+#define ZmaxDisplacementFrom0_mm 200
 #define maxSpeed_mmps 24 
 #define stepsPerRev 3200//assuming all are the same microstepping
 

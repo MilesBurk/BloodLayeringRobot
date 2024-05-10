@@ -17,17 +17,18 @@
 #define limitSwitchZPin 34
 
 //offsets indegrees
-#define tube1_Offset -4
-#define tube2_Offset -6
-#define tube3_Offset -4
-#define tube4_Offset 2
+#define tube1_Offset 11
+#define tube2_Offset 5
+#define tube3_Offset 9
+#define tube4_Offset -2
 
 #define tube1 15
 #define tube2 9
 #define tube3 4
 #define tube4 0
 
-#define heightAbovePivot_um 50000
+//THIS roughly means the distance you want to nozzle to be at before entrance into the tube at 60 degrees
+#define heightAbovePivot_um 55000
 #define tubeWidth_mm 27
 
 #define pumpPin 14
@@ -38,9 +39,9 @@
 #define startingX_mm 0
 #define startingY_mm 67
 
-#define firstTubeGap 89
+#define firstTubeGap 92
 #define secondTubeGap 94
-#define thirdTubeGap 92
+#define thirdTubeGap 94
 
 #define NUM_TUBES 4
 
@@ -136,9 +137,44 @@ void loop() {
     //Adding this line to the test branch
 
     
-    //performFillingMotionforAll4();
-  performFillingMotionFor1Tube();
+    performFillingMotionforAll4();
+  
+  
+  //performFillingMotionFor1Tube();
 
+
+  /*
+    Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
+    //set all servos to 0 deg to test initial offsets.
+    for(int i = 0; i < NUM_TUBES; i++){
+      servoPos_pulse[i] = goToAngle(0, tubePins[i], tubeOffsets[i]);
+    }
+
+    Gantry.goToRelativePosition((tubeSideToSideGapsOffsets_mm[1] + tubeSideToSideGapsOffsets_mm[2]+tubeSideToSideGapsOffsets_mm[3])*1000, 0, 0, 5000);
+    //Gantry.goToRelativePosition((tubeSideToSideGapsOffsets_mm[1] + tubeSideToSideGapsOffsets_mm[2]+ tubeSideToSideGapsOffsets_mm[3])*1000, 0, 0, 5000);
+
+    //tube 2 needs to go down 1mm to match tube 1
+    //tube 3 is perfect
+    //tube 3 looks good as well.
+
+    //maybe offsets are not significant and get away without them. test 
+  */
+
+
+
+
+
+  /*
+      for(int i = 0; i < NUM_TUBES; i++){
+      servoPos_pulse[i] = goToAngle(60, tubePins[i], tubeOffsets[i]);
+    }
+  delay(1000);
+  //offsets kevin used
+  //12, 8, 11,0
+      for(int i = 0; i < NUM_TUBES; i++){
+      servoPos_pulse[i] = sweepToAngle(0, 2, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
+    }
+  */
 
 
   }
@@ -270,64 +306,123 @@ for(int i = 0; i < NUM_TUBES; i++){
   delay(1000);
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
-  
-  //initizl pump prime
-  //setPumpRPM(300, pumpPin, pumpMicrosteps);
-  //delay(1900);
-  
-  //test
-
- 
+   
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
   
-  int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
-  int intialHeightAboveAxis = 47000;
-  Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
-  servoPos_pulse[i] = sweepToAngle(firstFillAngle, 3, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
-  delay(1000);
- 
-  int entranceDistance_um = 60000;
-  //slide into tube very slowly
-  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
+  //move back
+  //Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
 
-    //ADD PUMPING SEQUENCE HERE
-  setPumpRPM(3, pumpPin, pumpMicrosteps);
+  //Offset in z direction so that nozzle travels along bottom side of tube as opposed to along the center of thubes axis
+  int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
+  
+  //note that I 57000 ensures contact but maybe even  bit too much bending of the nozzle
+  //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
+  int intialHeightAboveAxis = 55000;
+  //int intialHeightAboveAxis = heightAbovePivot_um;//I am pretty sure these should be the same thing, so I want to avoid confusion but then makes it slightly harder to fine tune, this is postentially where I would add additional z offset
+  
+  //move down
+  //Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+  
+  
+  //try combining moves int o1 diagonal pass 
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+
+  
+  
   delay(1000);
+
+  int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
+  //FIRST MOVE TUBE 15 degs so there are no collisions then move back
+  servoPos_pulse[i] = sweepToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
+
+  int entranceDistance_um = 75000;
+  //slide into tube very slowly as deep as posssible
+  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
+   
+  servoPos_pulse[i] = sweepToAngle(firstFillAngle, 1, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
+
+  //initizl pump prime
+  setPumpRPM(300, pumpPin, pumpMicrosteps);
+  delay(1900);
+  //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
+
+
+  //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
+
+  //find distance to move out of the tube
+    //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
+    int exitDistance_um = entranceDistance_um - 10000;
+  //the line below pulls the tube out in 1 shot where as the loop lets you set different pump speeds as you pull it out.
+  Gantry.goToRelativePosition(0, exitDistance_um*sin(PI*firstFillAngle/float(180)), exitDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+   
+   /*
+      //HERE I LET YOU DO DIFFERENT PUMP SEQUENCES AS YOU FILL IT UP
+   int pumpRPMS[] = {0, 0, 0, 0};
+   //MAKE SURE BOTH THESE ARRAYS HAVE SAME NUMBER OF ELEMENTS!!
+   int delays_ms_Per_pumpingInterval[] = {1000, 1000, 1000, 1000};
+   int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
+   int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;
+   for(int i = 0; i < numberOfPumpingSequencesWhileExitingTube; i++){
+    //set new pumping speed and slide gantry up tube, take sliding time as delay before new pumping speed
+    setPumpRPM(pumpRPMS[i], pumpPin, pumpMicrosteps);
+    Gantry.goToRelativePosition(0, exitDistancePerPumpSequence_um*sin(PI*firstFillAngle/float(180)), exitDistancePerPumpSequence_um*cos(PI*firstFillAngle/float(180)), delays_ms_Per_pumpingInterval[i]);
+   }
+   */
+
+    //BELOW I LEFT THE OLD PUMPING SEQUENCE FOR YOUR REFERENCE IF IT IS STILL USEFUL for reference of speeds and delay times
+   /*
+    //ADD PUMPING SEQUENCE HERE
+  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  //delay(3*60000);
   setPumpRPM(0, pumpPin, pumpMicrosteps);
 
-
-
-  
-  delay(1000);
-  //travel back up tube to the top
-  entranceDistance_um = 45000;
+  entranceDistance_um = 15000;
   Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
 
-
-//take the nozzle out
+       delay(10000);
+  setPumpRPM(5, pumpPin, pumpMicrosteps);
+  delay(60000);
+  setPumpRPM(7, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(15, pumpPin, pumpMicrosteps);
+  delay(30000);
+  setPumpRPM(0, pumpPin, pumpMicrosteps);
+   */
+  
+  //take the nozzle out by traveling straight up.
   Gantry.goToRelativePosition(0, 0, 40000, 5000);
 
   // straighten out 
   int finalFillAngle = -10;
-  servoPos_pulse[i] = sweepToAngle(finalFillAngle, 6, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
-  delay(1000);
+  servoPos_pulse[i] = sweepToAngle(finalFillAngle, 1, tubePins[i], tubeOffsets[i], servoPos_pulse[i]);
 
   //go to center above the tube
-  // note: 47000 zoffset from center position
   Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
 
-  int depthBelowTubeTop_um = 15000;
-  //take the nozzle to tube wall
-  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
+int depthBelowTubeTop_um = 25000;//this is for the depth along the tube wall you want the final fill position to be at.
 
-  //reset back to centered position
-  //only do this after the pump is stopped
-  //must add logic to stop code here and then only continue once the volume sensor is detected
-  //while(not sense)
-  //continue
-  Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 3);
+
+  //take the nozzle to tube wall, old logic
+  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
+  
+
+
+  setPumpRPM(50, pumpPin, pumpMicrosteps);
+  delay(1000);
+  //delay(10000);//old part that I commented out for faster testing speed.
+
+  //go to center above the tube
+  Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
+
+  //go back to center
+  servoPos_pulse[i] = goToAngle(0, tubePins[i], tubeOffsets[i]);
+
+
+
+
   
 }
 
@@ -371,28 +466,75 @@ void stopPump(){
 void performFillingMotionFor1Tube(){
   servo1Pos = goToAngle(0, tube1, tube1_Offset);
 
-
   delay(1000);
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
    
+   //delay(100000);
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
   
+  //move back
+  //Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), 0, 5000);
+
+  //Offset in z direction so that nozzle travels along bottom side of tube as opposed to along the center of thubes axis
   int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
-  int intialHeightAboveAxis = 47000;
-  Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
-  servo1Pos = sweepToAngle(firstFillAngle, 1, tube1, tube1_Offset, servo1Pos);
+  
+  //note that I 57000 ensures contact but maybe even  bit too much bending of the nozzle
+  //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
+  int intialHeightAboveAxis = 55000;
+  //int intialHeightAboveAxis = heightAbovePivot_um;//I am pretty sure these should be the same thing, so I want to avoid confusion but then makes it slightly harder to fine tune, this is postentially where I would add additional z offset
+  
+  //move down
+  //Gantry.goToRelativePosition(0, 0, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+  
+  
+  //try combining moves int o1 diagonal pass 
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+
+  
+  
   delay(1000);
- 
-  int entranceDistance_um = 60000;
-  //slide into tube very slowly
+
+  int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
+  //FIRST MOVE TUBE 5 degs so there are no collisions then move back
+    servo1Pos = sweepToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tube1, tube1_Offset, servo1Pos);
+
+  int entranceDistance_um = 75000;
+  //slide into tube very slowly as deep as posssible
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
-    //initizl pump prime
+   
+  servo1Pos = sweepToAngle(firstFillAngle, 1, tube1, tube1_Offset, servo1Pos);
+  //initizl pump prime
   setPumpRPM(300, pumpPin, pumpMicrosteps);
   delay(1900);
-  
+  //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
+
+
+  //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
+
+  //find distance to move out of the tube
+    //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
+    int exitDistance_um = entranceDistance_um - 10000;
+  //the line below pulls the tube out in 1 shot where as the loop lets you set different pump speeds as you pull it out.
+  Gantry.goToRelativePosition(0, exitDistance_um*sin(PI*firstFillAngle/float(180)), exitDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
+   
+   /*
+      //HERE I LET YOU DO DIFFERENT PUMP SEQUENCES AS YOU FILL IT UP
+   int pumpRPMS[] = {0, 0, 0, 0};
+   //MAKE SURE BOTH THESE ARRAYS HAVE SAME NUMBER OF ELEMENTS!!
+   int delays_ms_Per_pumpingInterval[] = {1000, 1000, 1000, 1000};
+   int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
+   int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;
+   for(int i = 0; i < numberOfPumpingSequencesWhileExitingTube; i++){
+    //set new pumping speed and slide gantry up tube, take sliding time as delay before new pumping speed
+    setPumpRPM(pumpRPMS[i], pumpPin, pumpMicrosteps);
+    Gantry.goToRelativePosition(0, exitDistancePerPumpSequence_um*sin(PI*firstFillAngle/float(180)), exitDistancePerPumpSequence_um*cos(PI*firstFillAngle/float(180)), delays_ms_Per_pumpingInterval[i]);
+   }
+   */
+
+    //BELOW I LEFT THE OLD PUMPING SEQUENCE FOR YOUR REFERENCE IF IT IS STILL USEFUL for reference of speeds and delay times
+   /*
     //ADD PUMPING SEQUENCE HERE
   setPumpRPM(10, pumpPin, pumpMicrosteps);
   //delay(3*60000);
@@ -401,8 +543,7 @@ void performFillingMotionFor1Tube(){
   entranceDistance_um = 15000;
   Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
 
-  /*
-    delay(10000);
+       delay(10000);
   setPumpRPM(5, pumpPin, pumpMicrosteps);
   delay(60000);
   setPumpRPM(7, pumpPin, pumpMicrosteps);
@@ -412,30 +553,45 @@ void performFillingMotionFor1Tube(){
   setPumpRPM(15, pumpPin, pumpMicrosteps);
   delay(30000);
   setPumpRPM(0, pumpPin, pumpMicrosteps);
-  */
-
-  delay(2000);
-  //travel back up tube to the top
-  entranceDistance_um = 30000;
-  Gantry.goToRelativePosition(0, entranceDistance_um*sin(PI*firstFillAngle/float(180)), entranceDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
-
-//take the nozzle out
+   */
+  
+  //take the nozzle out by traveling straight up.
   Gantry.goToRelativePosition(0, 0, 40000, 5000);
 
   // straighten out 
   int finalFillAngle = -10;
-  servo1Pos = sweepToAngle(finalFillAngle, 6, tube1, tube1_Offset, servo1Pos);
+  servo1Pos = sweepToAngle(finalFillAngle, 2, tube1, tube1_Offset, servo1Pos);
 
   //go to center above the tube
-  // note: 47000 zoffset from center position
   Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
 
 
-  int depthBelowTubeTop_um = 15000;
-  //take the nozzle to tube wall
+
+/*
+
+  int tubeTopHeightAboveSevo_um = 40000;
+  float alphaAngle_rad = atan((tubeWidth_mm*1000/2)/(tubeTopHeightAboveSevo_um - depthBelowTubeTop_um));
+  int c = sin(alphaAngle_rad) * tubeWidth_mm*1000/2;
+  float B_angleRad = PI/2 - abs(finalFillAngle)*PI/180 - alphaAngle_rad;
+
+
+  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 - c*cos(B_angleRad)),   -(intialHeightAboveAxis - c*sin(B_angleRad)), 5000);
+*/
+  int depthBelowTubeTop_um = 25000;//this is for the depth along the tube wall you want the final fill position to be at.
+
+
+  //take the nozzle to tube wall, old logic
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
   
+
+
   setPumpRPM(50, pumpPin, pumpMicrosteps);
   delay(10000);
+
+  //go to center above the tube
+  Gantry.goToAbsPosition_mm(Gantry.getXDisplacement_um()/1000, startingY_mm, startingZ_mm, 5);
+
+  //go back to center
+  servo1Pos = sweepToAngle(0, 2, tube1, tube1_Offset, servo1Pos);
 
 }

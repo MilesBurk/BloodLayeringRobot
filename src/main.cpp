@@ -34,6 +34,8 @@
 #define pumpPin 14
 #define pumpMicrosteps 16
 
+#define pumpDirectionPin 23 //NOTE THAT FORWARD DIRECTION FOR THE PUMP IS TRUE/HIGH
+
 #define volumeSensingPin 23
 
 #define startingX_mm 0
@@ -44,6 +46,8 @@
 #define thirdTubeGap 94
 
 #define NUM_TUBES 4
+
+bool pumpDirection = true;//true is forward false is backwards
 
 int tubeSideToSideGapsOffsets_mm[4] = {0, firstTubeGap, secondTubeGap, thirdTubeGap};
 
@@ -76,11 +80,15 @@ void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
 //NOTE CAN potentially use all limit switches on same pin, problem is would have to look for short circuits.
 void setupLimitSwitchISR(int pinNumber);
 
+void setPumpDirection(bool dir);//true is forward, false is reverse
+
 void setup() {
   //Initialize buttons
   pinMode(runButton, INPUT);
   pinMode(homeButton, INPUT);
   pinMode(emergencyStopButton, INPUT);
+  pinMode(pumpDirectionPin, OUTPUT);
+  setPumpDirection(true);//true is forward
   
   //Initialize limit switches
   setupLimitSwitchISR(limitSwitchXPin);
@@ -596,4 +604,10 @@ void performFillingMotionFor1Tube(){
   //go back to center
   servo1Pos = sweepToAngle(0, 2, tube1, tube1_Offset, servo1Pos);
 
+}
+
+//true is forward, false is reverse
+void setPumpDirection(bool dir){
+  pumpDirection = dir;
+  digitalWrite(pumpDirectionPin, pumpDirection);
 }

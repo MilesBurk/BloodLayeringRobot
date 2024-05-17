@@ -1,20 +1,14 @@
 #include "ballScrew.h"
 #include "Arduino.h"
 
-#define testLED 25
-
-volatile bool ballScrew ::switchTriggered = false;
 
 ballScrew :: ballScrew(){
     //empty default constructor so can at least initialize gantry array
 }
 
-ballScrew :: ballScrew(int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero){
-    
-    //pinMode(testLED, OUTPUT);
-    //digitalWrite(testLED, LOW);
+ballScrew :: ballScrew(int limitSwitchPin, int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero){
 
-    
+    limitPin = limitSwitchPin;
     stepPin = stepPinNumber;
     dirPin = directionPinNumber;
     stepsPerRevolution = stepsPerRevolutions;
@@ -26,11 +20,6 @@ ballScrew :: ballScrew(int stepPinNumber, int directionPinNumber, int stepsPerRe
     isHomingDirectionPositive = isHomingDirPositive;
     isHomingSideZero = isHomeZero;
     initializeMotorPins();
-    //setLimitSwitchInterupt();
-    //does go through here
-    pinMode(testLED,OUTPUT);
-    digitalWrite(testLED, LOW);
-
 }
 
 void ballScrew::setPulseDelay_us(int delayUs){
@@ -170,14 +159,6 @@ void ballScrew::setSteps(unsigned int steps, bool dir){
     direction = dir;
     remainingSteps = steps;
     digitalWrite(dirPin, direction);//SHOULD MOVE  to runMotor code
-    /*
-        if(direction){
-        digitalWrite(dirPin, HIGH);
-    }
-    else{
-        digitalWrite(dirPin, LOW);
-    }
-    */
 }
 
 int ballScrew::getRemainingSteps(){
@@ -193,46 +174,23 @@ void ballScrew::emergencyStopMotor(){
 void ballScrew::initializeMotorPins(){
     pinMode(stepPin, OUTPUT);
     pinMode(dirPin, OUTPUT);
+    pinMode(limitPin, INPUT);
     digitalWrite(dirPin, positiveDirection);
 }
 
-
-
 int ballScrew::getLinearSteps(int length_um){
-  //note this does not have the specific motor must fix
-  //motor1.remainingSteps = length_um*motor1.stepsPerRevolution/(pitchmm * 1000)
     return length_um*stepsPerRevolution/(pitch_mm * 1000);
-
 }
 
 void ballScrew::homingBallScrew(){
     //very importatn to set to 0 first
 
-    //note the big downside to this implementation is that if the switch is hit, the motor will only stop if it is homing, if it is not then it can hit but that would only happen if it skips steps, and thus is the risk you take with open loop control
-    //delay(1000);
-
     forcedStop = false;
     //problem is it wont instantly stop the it will still take those additional 500 um step which can be bad maybe, basically would need to wait for runMotor to finish
-    switchTriggered = false;
+
+    //move forward a little to get off of switch, consider that hte new 0 position
     int distance_um_FromSwitch = 3000;
     int stepsToTake = getLinearSteps(distance_um_FromSwitch);
-    //prevInteruptTime = 0;
-    //int distance_um = 2000;
-    //int stepsToTake = getLinearSteps(distance_um, pitch_mm);
-    //homingDone = false;
-    /*
-        while(!homingDone){
-        //I think if I go this approach would need some custome homing function where it actually checks each step that way it stops as soon as interupt is triggered
-
-        setSteps(stepsToTake, false);
-        runMotor(500);
-    }
-    */
-   //will need to check this speed with the different motor tupes
-   //int homingDelay_us = 100; //set different homing delays depending on pitch, could make a 
-    
-    
-    //digitalWrite(getDirPin(), false);//go in direction towards motor
 
     bool homingDir;
     if (isHomingDirectionPositive){
@@ -242,14 +200,34 @@ void ballScrew::homingBallScrew(){
         homingDir = !positiveDirection;
     }
 
+    checkLimitSwitch();//perform initial check to see if it is touching the limit switch
+    //special case if the motor is already on the switch, then move the ball screw away from the switch until the switch is no longer pressed
+    if(isLimitSwitchPressed){
+        //move away from the limit switch 
+        digitalWrite(getDirPin(), !homingDir);
+        while(isLimitSwitchPressed){
+            digitalWrite(getStepPin(), HIGH);
+            delayMicroseconds(minimumMicrosHigh);
+            digitalWrite(getStepPin(), LOW);
+            delayMicroseconds(homingDelay_us); 
+            checkLimitSwitch();
+            if(forcedStop){
+                return;
+            }
+        }
+        delay(1000);
+    }
+
+    //move motor towards limit switch to re-home sequence
     digitalWrite(getDirPin(), homingDir);
 
     //limit switch ISR will trigger this interupt
-    while(!switchTriggered){
+    while(!isLimitSwitchPressed){
         digitalWrite(getStepPin(), HIGH);
         delayMicroseconds(minimumMicrosHigh);
         digitalWrite(getStepPin(), LOW);
         delayMicroseconds(homingDelay_us); 
+        checkLimitSwitch();
         if(forcedStop){
             return;
             //break;
@@ -266,9 +244,6 @@ void ballScrew::homingBallScrew(){
     runMotor(1000);
     //NOW I DEFINE THIS LOCATION AS THE ZERO OF MY SYSTEM, INITIALIZE ALL ATTRIBUTES
     setHomePosition();
-
-    //UNCOMMENT LATER
-    digitalWrite(testLED, LOW);
 }
 
 void ballScrew::setHomePosition(){
@@ -287,43 +262,6 @@ void ballScrew::setHomePosition(){
 }
 
 
-/*
-//I GUESS I NEED TO INCLUDE THE ISR's IN MAIN but luckily it is very simple.
-*/
-void ballScrew::limitSwitchISR(){
-    /*
-    int debounceTime_ms = 1000;
-    if(millis() - prevInteruptTime >  debounceTime_ms){
-        remainingSteps = 0;
-        prevInteruptTime = millis();
-        homingDone = true;
-    }
-    */
-   //basically alternatively just use single ISR and fix the problem in code, this will work fine as long as we are homing 1 thing at a time, which we are because it will block the code
-    //dont actually need any debouncing because I just care when it strikes switch for the first time
-    switchTriggered = true;
-    pinMode(testLED, OUTPUT);
-            digitalWrite(testLED, LOW);
-
-            digitalWrite(testLED, HIGH);
-    //digitalWrite(testLED, HIGH);
-
-    /*
-        int debounceTime_ms = 500;
-    if(millis() - prevInteruptTime >  debounceTime_ms){
-        prevInteruptTime = millis();//note this doesnt even really matter here anymore
-        switchTriggered = true;
-    }
-    */
-}
-
-/*//this did not work unfortunately
-void ballScrew::setLimitSwitchInterupt(){
-    pinMode(limitSwitchPin, INPUT);
-    attachInterrupt(digitalPinToInterrupt(limitSwitchPin), limitSwitchISR, RISING);
-}
-*/
-
 
 int ballScrew::getDirPin(){
     return dirPin;
@@ -331,6 +269,10 @@ int ballScrew::getDirPin(){
 
 int ballScrew:: getStepPin(){
     return stepPin;
+}
+
+void ballScrew::checkLimitSwitch(){
+    isLimitSwitchPressed = digitalRead(limitPin);
 }
 
 

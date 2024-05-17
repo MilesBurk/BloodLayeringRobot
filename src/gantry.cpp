@@ -15,6 +15,9 @@
 #define xPitch_mm 5
 #define yPitch_mm 5
 #define zPitch_mm 2
+#define limitSwitchXPin 36
+#define limitSwitchYPin 39
+#define limitSwitchZPin 34
 #define XmaxDisplacementFrom0_mm 285
 #define YmaxDisplacementFrom0_mm 140
 #define ZmaxDisplacementFrom0_mm 200
@@ -34,14 +37,14 @@ gantry::gantry(){
     //ballScrew(int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero);
 
     //BELOW IS THE CONFIGURATION FOR THE X AXIS
-    ballScrew X = ballScrew(xStepPin, xDirPin, stepsPerRev, xPitch_mm, maxSpeed_mmps, XmaxDisplacementFrom0_mm*1000,true, false,true);
+    ballScrew X = ballScrew(limitSwitchXPin, xStepPin, xDirPin, stepsPerRev, xPitch_mm, maxSpeed_mmps, XmaxDisplacementFrom0_mm*1000,true, false,true);
 
     //BELOW IS THE CONFIGURATION FOR THE Y AXIS (back and forth)
-    ballScrew Y = ballScrew(yStepPin, yDirPin, stepsPerRev, yPitch_mm, maxSpeed_mmps, YmaxDisplacementFrom0_mm*1000,true, false,true);
+    ballScrew Y = ballScrew(limitSwitchYPin, yStepPin, yDirPin, stepsPerRev, yPitch_mm, maxSpeed_mmps, YmaxDisplacementFrom0_mm*1000,true, false,true);
 
     //BELOW IS ballscrew for z axis NEMA 14, note this motor is rated for 0.9A, 2mm pitch
     //ballScrew Z = ballScrew(zStepPin, zDirPin, stepsPerRev, zPitch_mm, 30, ZmaxDisplacementFrom0_mm*1000,false, true,false);
-    ballScrew Z = ballScrew(zStepPin, zDirPin, stepsPerRev, zPitch_mm, maxSpeed_mmps, ZmaxDisplacementFrom0_mm*1000,false, true,false);
+    ballScrew Z = ballScrew(limitSwitchZPin, zStepPin, zDirPin, stepsPerRev, zPitch_mm, maxSpeed_mmps, ZmaxDisplacementFrom0_mm*1000,false, true,false);
 
     //NOTE THAT CALLING THAT CREATING THE BALL SCREW OBJ SHOULD HAVE INITIALIZED PINS
     axis[0] = X;

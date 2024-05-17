@@ -12,9 +12,6 @@
 #define homeButton 32
 #define emergencyStopButton 33
 
-#define limitSwitchXPin 36
-#define limitSwitchYPin 39
-#define limitSwitchZPin 34
 
 //offsets indegrees
 #define tube1_Offset 11
@@ -75,10 +72,6 @@ void performFillingMotionforAll4();
 void performFillingMotionFor1Tube(int tubeNumber);
 void onTimer();
 void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
-
-//NOTE CAN potentially use all limit switches on same pin, problem is would have to look for short circuits.
-void setupLimitSwitchISR(int pinNumber);
-
 void setPumpDirection(bool dir);//true is forward, false is reverse
 
 void setup() {
@@ -88,11 +81,7 @@ void setup() {
   pinMode(emergencyStopButton, INPUT);
   pinMode(pumpDirectionPin, OUTPUT);
   setPumpDirection(true);//true is forward
-  
-  //Initialize limit switches
-  setupLimitSwitchISR(limitSwitchXPin);
-  setupLimitSwitchISR(limitSwitchYPin);
-  setupLimitSwitchISR(limitSwitchZPin);
+
 
   //Initialize pump pin
   pinMode(pumpPin, OUTPUT);
@@ -320,11 +309,6 @@ void setPumpDirection(bool dir){
 void stopAllMotors(){
   Gantry.emergencyStop();
   setPumpRPM(0, pumpPin, pumpMicrosteps);  
-}
-
-void setupLimitSwitchISR(int pinNumber){
-  pinMode(pinNumber, INPUT);
-  attachInterrupt(digitalPinToInterrupt(pinNumber), ballScrew::limitSwitchISR, RISING);
 }
 
 void onTimer(){

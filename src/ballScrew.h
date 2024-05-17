@@ -30,7 +30,7 @@ class ballScrew {
     //static bool switchTriggered;
 
     ballScrew();
-    ballScrew(int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero);
+    ballScrew(int limitSwitchPin, int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero);
     void initializeMotorPins();
     void setStepDelays(unsigned long totalTime_us);
     //NOTE I DONT KNOW if ISR WILL BE LINKED TO INITIAL OBJ OR ARRAY OBJ so maybe leave as function to set and then can call when ready
@@ -39,8 +39,6 @@ class ballScrew {
     void runMotor(int completionTime_ms);
     void moveToAbsPosition(int disp_um);
     void moveToRelativePosition(int dis_um);
-    static void limitSwitchISR();
-    //void setLimitSwitchInterupt();
     void setSteps(unsigned int steps, bool dir);
     int getDirPin();
     int getStepPin();
@@ -53,7 +51,7 @@ class ballScrew {
     int getDelay_us();
 
     int getRemainingSteps();
-    
+    void checkLimitSwitch();
     int remainingSteps = 0;//make this private again later and add proper accessors and mutators, just easier to make public for now.
     bool direction;
     bool positiveDirection;
@@ -63,8 +61,10 @@ class ballScrew {
 
 
   private:
+    bool isLimitSwitchPressed;
     int dirPin;
     int stepPin;
+    int limitPin;
     int pitch_mm;
     int maxSpeed_mmps = 20;
     int maxDisplacement_um;

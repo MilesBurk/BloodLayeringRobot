@@ -1,28 +1,11 @@
 #include "Arduino.h"
 #include "gantry.h"
 #include "ballScrew.h"
-#include <Wire.h>
-#include <Adafruit_PWMServoDriver.h>
-
-#define MIN_Width 500
-#define MAX_WIDTH 2500
-#define freq 50
+#include "servoTiltModule.h"
 
 #define runButton 35 
 #define homeButton 32
 #define emergencyStopButton 33
-
-
-//offsets indegrees
-#define tube1_Offset 11
-#define tube2_Offset 5
-#define tube3_Offset 9
-#define tube4_Offset -2
-
-#define tube1 15
-#define tube2 9
-#define tube3 4
-#define tube4 0
 
 //THIS roughly means the distance you want to nozzle to be at before entrance into the tube at 60 degrees
 #define heightAbovePivot_um 55000
@@ -38,33 +21,18 @@
 #define startingX_mm 0
 #define startingY_mm 67
 
-#define firstTubeGap 92
-#define secondTubeGap 94
-#define thirdTubeGap 94
 
-#define NUM_TUBES 4
 
 bool pumpDirection = true;//true is forward false is backwards
 
-int tubeSideToSideGapsOffsets_mm[4] = {0, firstTubeGap, secondTubeGap, thirdTubeGap};
 
 hw_timer_t * timer = NULL;      //H/W timer defining (Pointer to the Structure)
 volatile bool pinState = false;
 volatile bool isPumpOn = false;
 
+servoTiltModule TiltModule = servoTiltModule();
 gantry Gantry = gantry();
 int startingZ_mm  = Gantry.getMaxZDisplacement() - 50;
-
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-//test
-int servo1Pos = 0;
-
-int servoPos_pulse[4] = {0, 0, 0, 0};
-int tubePins[4] = {tube1, tube2, tube3, tube4};
-int tubeOffsets[4] = {tube1_Offset, tube2_Offset, tube3_Offset, tube4_Offset};
-
-int goToAngle(int angle, int motorNum, int offset_deg);
-int sweepToAngle(int angle, float time_s, int motorNum, int offset_deg, int currentPosition_pulse);
 
 void stopAllMotors();
 void stopPump();
@@ -93,9 +61,7 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(volumeSensingPin), stopPump, FALLING);
 
-  //Initialize PWM for servo driver
-  pwm.begin();
-  pwm.setPWMFreq(freq);
+  
 
   //Initialize internal timer interupt used to control pump rpm
   timer = timerBegin(0, 80, true);           	// timer 0, prescalar: 80, UP counting
@@ -109,17 +75,12 @@ void loop() {
   //Perform homing sequence and tilt tube holders to initial angles
   if(digitalRead(homeButton) == HIGH){
     //go to upright angle
-    for(int i = 0; i < NUM_TUBES; i++){
-      servoPos_pulse[i] = goToAngle(0, tubePins[i], tubeOffsets[i]);
-    }
+    TiltModule.setAllTubesToAngle(0);
     delay(1000);
     Gantry.homeGantry();
     //go to loading angle
     int loadingAngle = -30;
-    for(int i = 0; i < NUM_TUBES; i++){
-      servoPos_pulse[i] = goToAngle(loadingAngle, tubePins[i], tubeOffsets[i]);
-    }
-
+    TiltModule.setAllTubesToAngle(loadingAngle);
   }
 
   //Perform one of the filling sequences
@@ -134,35 +95,17 @@ void loop() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void performFillingMotionFor1Tube(int tubeNumber){
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
   }
 
-  int startingXPosition_mm = startingX_mm;
-  //add all the gaps.
-  for(int i = 0; i < tubeNumber; i++){
-    startingXPosition_mm = startingXPosition_mm + tubeSideToSideGapsOffsets_mm[i];
-  }
+  int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
   setPumpDirection(true);
-
-  servoPos_pulse[tubeNumber-1] = goToAngle(0, tubePins[tubeNumber-1], tubeOffsets[tubeNumber-1]);
+  
+  TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
   delay(1000);
   
@@ -191,14 +134,14 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
   //FIRST MOVE TUBE 5 degs so there are no collisions then move back
-  servoPos_pulse[tubeNumber-1] = sweepToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubePins[tubeNumber-1], tubeOffsets[tubeNumber-1], servoPos_pulse[tubeNumber-1]);
+  TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
 
 
   int entranceDistance_um = 70000;
   //slide into tube very slowly as deep as posssible
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
    
-  servoPos_pulse[tubeNumber-1] = sweepToAngle(firstFillAngle, 1, tubePins[tubeNumber-1], tubeOffsets[tubeNumber-1], servoPos_pulse[tubeNumber-1]);
+  TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
 
   //initizl pump prime
   setPumpRPM(300, pumpPin, pumpMicrosteps);
@@ -234,7 +177,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   // straighten out 
   int finalFillAngle = -10;
-  servoPos_pulse[tubeNumber-1] = sweepToAngle(finalFillAngle, 1, tubePins[tubeNumber-1], tubeOffsets[tubeNumber-1], servoPos_pulse[tubeNumber-1]);
+  TiltModule.sweepTubeToAngle(finalFillAngle, 1, tubeNumber);
 
 
   //go to center above the tube
@@ -253,7 +196,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
 
   //go back to center
-  servoPos_pulse[tubeNumber-1] = sweepToAngle(0, 2, tubePins[tubeNumber-1], tubeOffsets[tubeNumber-1], servoPos_pulse[tubeNumber-1]);
+  TiltModule.sweepTubeToAngle(0, 2, tubeNumber);
 }
 
 //DO NOT CHANGE ANYTHING BELOW THIS LINE
@@ -291,7 +234,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
 void performFillingMotionforAll4(){
   //cycle through all 4 motions.
-  for(int i = 0; i < NUM_TUBES; i++){
+  for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
     performFillingMotionFor1Tube(i+1);
   }
 
@@ -338,47 +281,5 @@ void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep){
   }
 }
 
-//Note that positive angle is when tube tilts away from user standing at front, this is done because we normally want like 60 degrees
-//offset is in degrees and is used to calibrate to find true zero position for consistency accross pieces
-int goToAngle(int angle, int motorNum, int offset_deg){
-  angle = angle + offset_deg;
-  int pulse_wide = map(angle, -90,90,MIN_Width,MAX_WIDTH);
-  int pulseWidth = int(float(pulse_wide)/ 1000000 * freq * 4096);
-  pwm.setPWM(motorNum, 0, pulseWidth);
-  return pulse_wide;
-}
 
-int sweepToAngle(int angle, float time_s, int motorNum, int offset_deg, int currentPosition_pulse){
-  angle = angle + offset_deg;
-  int pulseWidth, delay_ms;
-  int minRes = 5;//microsecond deadband
-  int pulse_wide = map(angle, -90,90,MIN_Width,MAX_WIDTH);
-  int diff = pulse_wide - currentPosition_pulse;
-  pulse_wide = currentPosition_pulse;
-
-  //if positive difference then need to move forward, else move backwards
-  if (diff > 0){
-    int ticks = diff/minRes;
-    delay_ms = 1000*time_s/ticks;
-    for(int i = 0; i < ticks; i++){
-          pulseWidth = int(float(pulse_wide)/ 1000000 * freq * 4096);
-          pwm.setPWM(motorNum, 0, pulseWidth);
-          delay(delay_ms);
-          pulse_wide = pulse_wide + minRes;
-    }
-    return pulse_wide - minRes;
-  }
-  else if(diff < 0){
-    int ticks = -diff/minRes;
-    delay_ms = 1000*time_s/ticks;
-    for(int i = 0; i < ticks; i++){
-      pulseWidth = int(float(pulse_wide)/ 1000000 * freq * 4096);
-      pwm.setPWM(motorNum, 0, pulseWidth);
-      delay(delay_ms);
-      pulse_wide = pulse_wide - minRes;
-    }
-    return pulse_wide + minRes;
-  }
-  return currentPosition_pulse;
-}
 

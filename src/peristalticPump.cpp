@@ -1,6 +1,10 @@
 #include "Arduino.h"
 #include "peristalticPump.h"
 
+volatile bool peristalticPump::pumpDirection = true;
+volatile bool peristalticPump::pinState = false;
+volatile bool peristalticPump::isPumpOn = false;
+
 peristalticPump::peristalticPump(){
     pumpDirection = true;//true is forward false is backwards
     pinState = false;
@@ -35,7 +39,7 @@ void peristalticPump::onTimer(){
 }
 
 void peristalticPump::stopPump(){
-  setPumpRPM(0);
+    isPumpOn = false;
 }
 
 void peristalticPump::setPumpRPM(int rpm){

@@ -9,15 +9,17 @@ class peristalticPump{
     public:
         peristalticPump();
         static void onTimer();
-        static void setPumpRPM(int rpm);
+        void setPumpRPM(int rpm);
         void setPumpDirection(bool dir);//true is forward, false is reverse
         static void stopPump();
-        static hw_timer_t * timer;      //H/W timer defining (Pointer to the Structure)
+        hw_timer_t *timer = NULL;      //H/W timer defining (Pointer to the Structure)
+
 
     private:
         static volatile bool pumpDirection;//true is forward false is backwards
         static volatile bool pinState;
         static volatile bool isPumpOn;
+
 };
 
 

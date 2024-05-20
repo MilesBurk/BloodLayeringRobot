@@ -3,29 +3,6 @@
 #include "ballScrew.h"
 
 
-
-
-//MUST ADD ALL PIN CONNECTIONS
-#define xStepPin 19
-#define xDirPin 18
-#define yStepPin 17
-#define yDirPin 16
-#define zStepPin 4 
-#define zDirPin 15
-#define xPitch_mm 5
-#define yPitch_mm 5
-#define zPitch_mm 2
-#define limitSwitchXPin 36
-#define limitSwitchYPin 39
-#define limitSwitchZPin 34
-#define XmaxDisplacementFrom0_mm 285
-#define YmaxDisplacementFrom0_mm 140
-#define ZmaxDisplacementFrom0_mm 200
-#define maxSpeed_mmps 24 
-#define stepsPerRev 3200//assuming all are the same microstepping
-
-
-
 //NOTE: MAKE SURE MOTORS ARE CONNECTED IN PROPER OriENtATION, I.E CCW is taken as the positive direction, => moves actuators forward, away from motor, consult photos.
 
 

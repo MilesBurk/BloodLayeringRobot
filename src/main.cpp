@@ -28,6 +28,7 @@ void initializeInterupts();
 void stopAllMotors();
 void performFillingMotionforAll4();
 void performFillingMotionFor1Tube(int tubeNumber);
+void lockerStorageSequence();
 
 
 void setup() {
@@ -52,6 +53,7 @@ void loop() {
   {
     //performFillingMotionforAll4();  
     performFillingMotionFor1Tube(3);
+    //lockerStorageSequence();
   }
 }
 
@@ -205,5 +207,8 @@ void initializePushButtons(){
     timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
   }
 
+void lockerStorageSequence(){
+  Gantry.goToAbsPosition_mm(Gantry.getMaxXDisplacement()/2, Gantry.getMaxYDisplacement()/2, Gantry.getMaxZDisplacement(), 10);
+}
 
 

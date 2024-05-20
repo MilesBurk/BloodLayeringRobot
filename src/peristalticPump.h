@@ -13,12 +13,12 @@ class peristalticPump{
         void setPumpDirection(bool dir);//true is forward, false is reverse
         static void stopPump();
         hw_timer_t *timer = NULL;      //H/W timer defining (Pointer to the Structure)
+        static volatile bool isPumpOn;
 
 
     private:
         static volatile bool pumpDirection;//true is forward false is backwards
         static volatile bool pinState;
-        static volatile bool isPumpOn;
 
 };
 

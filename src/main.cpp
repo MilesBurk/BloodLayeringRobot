@@ -22,7 +22,6 @@
 #define startingY_mm 67
 
 
-
 bool pumpDirection = true;//true is forward false is backwards
 
 
@@ -43,6 +42,11 @@ void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
 void setPumpDirection(bool dir);//true is forward, false is reverse
 
 void setup() {
+  //Initialize tilt module pwm
+  TiltModule.pwm = Adafruit_PWMServoDriver();
+  TiltModule.pwm.begin();
+  TiltModule.pwm.setPWMFreq(freq);
+  
   //Initialize buttons
   pinMode(runButton, INPUT);
   pinMode(homeButton, INPUT);
@@ -71,7 +75,6 @@ void setup() {
 }
 
 void loop() {
-
   //Perform homing sequence and tilt tube holders to initial angles
   if(digitalRead(homeButton) == HIGH){
     //go to upright angle
@@ -86,7 +89,7 @@ void loop() {
   //Perform one of the filling sequences
   if (digitalRead(runButton) == HIGH)
   {
-    //performFillingMotionforAll4();  
+    performFillingMotionforAll4();  
     performFillingMotionFor1Tube(3);
   }
 }

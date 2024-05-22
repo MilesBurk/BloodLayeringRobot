@@ -3,6 +3,7 @@
 #include "ballScrew.h"
 #include "servoTiltModule.h"
 #include "peristalticPump.h"
+#include "volumeSenseModule.h"
 
 #define runButton 35 
 #define homeButton 32
@@ -12,11 +13,11 @@
 #define heightAbovePivot_um 55000
 #define tubeWidth_mm 27
 
-#define volumeSensingPin 23
 
 #define startingX_mm 0
 #define startingY_mm 67
 
+volumeSenseModule VolumeSensors = volumeSenseModule();
 peristalticPump Pump = peristalticPump();
 
 servoTiltModule TiltModule = servoTiltModule();
@@ -28,6 +29,7 @@ void initializeInterupts();
 void stopAllMotors();
 void performFillingMotionforAll4();
 void performFillingMotionFor1Tube(int tubeNumber);
+void lockerStorageSequence();
 
 
 void setup() {
@@ -37,7 +39,6 @@ void setup() {
   TiltModule.pwm.setPWMFreq(freq);
   
   initializePushButtons();
-  pinMode(volumeSensingPin, INPUT);
   initializeInterupts();
 }
 
@@ -58,8 +59,8 @@ void loop() {
   {
 
     //performFillingMotionforAll4();  
-    performFillingMotionFor1Tube(1);
 
+    performFillingMotionFor1Tube(1);
   }
 }
 
@@ -71,6 +72,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
     return;
   }
 
+  VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
 
@@ -170,7 +172,8 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
   
   Pump.setPumpRPM(50);
-  delay(10000);
+  //here you would fill until the volume sensors is triggered.
+  while(peristalticPump::isPumpOn){};//basically wait until the pump turns itself off.
 
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
@@ -220,11 +223,18 @@ void initializePushButtons(){
   void initializeInterupts(){
     //Add external interupt for emergency stop button  
     attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
-    //Interupt for test volume sensor pin.
-    attachInterrupt(digitalPinToInterrupt(volumeSensingPin), peristalticPump::stopPump, FALLING);
+    
+    //Interupt for volume sensor pins.
+    for(int i = 0; i < numberOfSensors; i++){
+      attachInterrupt(digitalPinToInterrupt(volumeSenseModule::volumeSensorPins[i]), peristalticPump::stopPump, FALLING);
+    }
 
+    //Interupt for pump control
     timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
   }
 
+void lockerStorageSequence(){
+  Gantry.goToAbsPosition_mm(Gantry.getMaxXDisplacement()/2, Gantry.getMaxYDisplacement()/2, Gantry.getMaxZDisplacement(), 10);
+}
 
 

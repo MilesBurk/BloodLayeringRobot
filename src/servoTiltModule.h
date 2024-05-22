@@ -36,10 +36,10 @@ class servoTiltModule{
         void sweepTubeToAngle(int angle, float time_s, int tubeNum);
         int getNumberOfTubes();
         void setAllTubesToAngle(int angle_deg);
+        Adafruit_PWMServoDriver pwm;
+
         //basically I want to only interact with the tube tilting module for initialization. and to either go directly to an angle or sweep to an angle
     private:
-        Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-        float tubeAngle_deg[4];
         int tubeSideToSideGapsOffsets_mm[4] = {0, firstTubeGap, secondTubeGap, thirdTubeGap};
         int servoPos_pulse[4] = {0, 0, 0, 0};
         int tubePins[4] = {tube1, tube2, tube3, tube4};

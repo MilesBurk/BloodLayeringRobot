@@ -3,9 +3,7 @@
 
 
 servoTiltModule::servoTiltModule(){
-  //Initialize PWM for servo driver
-  pwm.begin();
-  pwm.setPWMFreq(freq);
+
 }
 
 int servoTiltModule::getAbsoluteStartingXPositionOfTube(int startingX_mm, int tubeNum){
@@ -24,6 +22,7 @@ int servoTiltModule::getAbsoluteStartingXPositionOfTube(int startingX_mm, int tu
 void servoTiltModule::setAllTubesToAngle(int angle_deg){
     for(int i = 0; i < NUM_TUBES; i++){
         goDirectlyToTubeAngle(angle_deg, i+1);
+        delay(500);
     }
 }
 

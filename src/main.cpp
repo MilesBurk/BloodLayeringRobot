@@ -15,7 +15,7 @@
 
 
 #define startingX_mm 0
-#define startingY_mm 67
+#define startingY_mm 63
 
 volumeSenseModule VolumeSensors = volumeSenseModule();
 peristalticPump Pump = peristalticPump();
@@ -58,8 +58,10 @@ void loop() {
   if (digitalRead(runButton) == HIGH)
   {
 
-    //performFillingMotionforAll4();  
+    //performFillingMotionforAll4(); 
+    //lockerStorageSequence(); 
 
+    //ONLY TEST WITH FIRST TUBE, OTHER VOLUYME SENSORES ARE NOT YET CONNECTED
     performFillingMotionFor1Tube(1);
   }
 }
@@ -134,17 +136,17 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
-  //find distance to move out of the tube
+  ///find distance to move out of the tube
     //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
-    int exitDistance_um = entranceDistance_um - 20000;
+    int exitDistance_um = entranceDistance_um - 11000;
   //the line below pulls the tube out in 1 shot where as the loop lets you set different pump speeds as you pull it out.
   //Gantry.goToRelativePosition(0, exitDistance_um*sin(PI*firstFillAngle/float(180)), exitDistance_um*cos(PI*firstFillAngle/float(180)), 5000);
    
    
       //HERE I LET YOU DO DIFFERENT PUMP SEQUENCES AS YOU FILL IT UP
-   int pumpRPMS[] = {10, 12, 14, 16, 18, 20, 0};
+   int pumpRPMS[] = {10, 12, 14, 16, 22, 25, 30, 0};
    //MAKE SURE BOTH THESE ARRAYS HAVE SAME NUMBER OF ELEMENTS!!
-   int delays_ms_Per_pumpingInterval[] = {30000, 30000, 30000, 20000, 15000, 15000, 1000};
+   int delays_ms_Per_pumpingInterval[] = {3000, 3000, 3000, 2000, 1500, 2000, 2000, 1000};
 
    int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
    int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;

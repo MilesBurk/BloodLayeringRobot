@@ -2,6 +2,7 @@
 #include "gantry.h"
 #include "ballScrew.h"
 #include "servoTiltModule.h"
+#include "peristalticPump.h"
 
 #define runButton 35 
 #define homeButton 32
@@ -11,35 +12,23 @@
 #define heightAbovePivot_um 55000
 #define tubeWidth_mm 27
 
-#define pumpPin 14
-#define pumpMicrosteps 16
-
-#define pumpDirectionPin 5 //NOTE THAT FORWARD DIRECTION FOR THE PUMP IS TRUE/HIGH
-
 #define volumeSensingPin 23
 
 #define startingX_mm 0
 #define startingY_mm 67
 
-
-bool pumpDirection = true;//true is forward false is backwards
-
-
-hw_timer_t * timer = NULL;      //H/W timer defining (Pointer to the Structure)
-volatile bool pinState = false;
-volatile bool isPumpOn = false;
+peristalticPump Pump = peristalticPump();
 
 servoTiltModule TiltModule = servoTiltModule();
 gantry Gantry = gantry();
 int startingZ_mm  = Gantry.getMaxZDisplacement() - 50;
 
+void initializePushButtons();
+void initializeInterupts();
 void stopAllMotors();
-void stopPump();
 void performFillingMotionforAll4();
 void performFillingMotionFor1Tube(int tubeNumber);
-void onTimer();
-void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep);
-void setPumpDirection(bool dir);//true is forward, false is reverse
+
 
 void setup() {
   //Initialize tilt module pwm
@@ -47,31 +36,9 @@ void setup() {
   TiltModule.pwm.begin();
   TiltModule.pwm.setPWMFreq(freq);
   
-  //Initialize buttons
-  pinMode(runButton, INPUT);
-  pinMode(homeButton, INPUT);
-  pinMode(emergencyStopButton, INPUT);
-  pinMode(pumpDirectionPin, OUTPUT);
-  setPumpDirection(true);//true is forward
-
-
-  //Initialize pump pin
-  pinMode(pumpPin, OUTPUT);
-
+  initializePushButtons();
   pinMode(volumeSensingPin, INPUT);
-
-  //Add external interupt for emergency stop button  
-  attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
-
-  attachInterrupt(digitalPinToInterrupt(volumeSensingPin), stopPump, FALLING);
-
-  
-
-  //Initialize internal timer interupt used to control pump rpm
-  timer = timerBegin(0, 80, true);           	// timer 0, prescalar: 80, UP counting
-  timerAttachInterrupt(timer, &onTimer, true); 	// Attach interrupt
-  timerAlarmWrite(timer, 1000000, true);  		// Match value= 1000000 for 1 sec. delay.
-  timerAlarmEnable(timer);           			// Enable Timer with interrupt (Alarm Enable)
+  initializeInterupts();
 }
 
 void loop() {
@@ -98,8 +65,6 @@ void loop() {
 
 
 
-
-
 void performFillingMotionFor1Tube(int tubeNumber){
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
@@ -108,16 +73,15 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
+
   //only for testing get rid after
   delay(1000);
-  setPumpDirection(false);
-  setPumpRPM(300, pumpPin, pumpMicrosteps);
+  Pump.setPumpDirection(false);
+  Pump.setPumpRPM(300);
   delay(3000);
-  setPumpRPM(0, pumpPin, pumpMicrosteps);
-  setPumpDirection(true);
+  Pump.setPumpRPM(0);
+  Pump.setPumpDirection(true);
 
-
-  setPumpDirection(true);
   
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
@@ -158,12 +122,12 @@ void performFillingMotionFor1Tube(int tubeNumber){
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
 
   //initizl pump prime
-  setPumpRPM(300, pumpPin, pumpMicrosteps);
+  Pump.setPumpRPM(300);
   delay(1900);
-  setPumpRPM(0, pumpPin, pumpMicrosteps);
+  Pump.setPumpRPM(0);
   delay(1000);
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
-  setPumpRPM(10, pumpPin, pumpMicrosteps);
+  Pump.setPumpRPM(10);
   delay(30000);
 
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
@@ -184,7 +148,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
    int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;
    for(int i = 0; i < numberOfPumpingSequencesWhileExitingTube; i++){
     //set new pumping speed and slide gantry up tube, take sliding time as delay before new pumping speed
-    setPumpRPM(pumpRPMS[i], pumpPin, pumpMicrosteps);
+    Pump.setPumpRPM(pumpRPMS[i]);
     Gantry.goToRelativePosition(0, exitDistancePerPumpSequence_um*sin(PI*firstFillAngle/float(180)), exitDistancePerPumpSequence_um*cos(PI*firstFillAngle/float(180)), delays_ms_Per_pumpingInterval[i]);
    }
   
@@ -205,7 +169,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   //take the nozzle to tube wall, old logic
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
   
-  setPumpRPM(50, pumpPin, pumpMicrosteps);
+  Pump.setPumpRPM(50);
   delay(10000);
 
   //go to center above the tube
@@ -216,46 +180,20 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
     //will need to be changed so it just runs once at the end of filling four tubes
   delay(1000);
-  setPumpDirection(false);
-  setPumpRPM(300, pumpPin, pumpMicrosteps);
+  Pump.setPumpDirection(false);
+  Pump.setPumpRPM(300);
   delay(3000);
-  setPumpRPM(0, pumpPin, pumpMicrosteps);
-  setPumpDirection(true);
+  Pump.setPumpRPM(0);
+  Pump.setPumpDirection(true);
 
 }
 
-//DO NOT CHANGE ANYTHING BELOW THIS LINE
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-*/
+
+
+
+
+
+
 
 void performFillingMotionforAll4(){
   //cycle through all 4 motions.
@@ -267,44 +205,26 @@ void performFillingMotionforAll4(){
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
 }
 
-
-//true is forward, false is reverse
-void setPumpDirection(bool dir){
-  pumpDirection = dir;
-  digitalWrite(pumpDirectionPin, pumpDirection);
-}
-
 void stopAllMotors(){
   Gantry.emergencyStop();
-  setPumpRPM(0, pumpPin, pumpMicrosteps);  
+  Pump.stopPump();  
 }
 
-void onTimer(){
-  if(isPumpOn){
-    pinState = !pinState;
-    digitalWrite(pumpPin, -pinState);
-  }
+void initializePushButtons(){
+  //Initialize buttons
+  pinMode(runButton, INPUT);
+  pinMode(homeButton, INPUT);
+  pinMode(emergencyStopButton, INPUT);
 }
 
-void stopPump(){
-  setPumpRPM(0, pumpPin, pumpMicrosteps);
-}
+  void initializeInterupts(){
+    //Add external interupt for emergency stop button  
+    attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
+    //Interupt for test volume sensor pin.
+    attachInterrupt(digitalPinToInterrupt(volumeSensingPin), peristalticPump::stopPump, FALLING);
 
-void setPumpRPM(int rpm, int pump_pin, int microstepsPerStep){
-  //note this code assumes that the prescaler on the internal timer (timer)
-  //is set such that each tick is a microsecond
-  int standardSteps = 200;
-  int stepsPerSecond = rpm*standardSteps*microstepsPerStep/60;
-  int pumpStepDelay_us = 1000000/stepsPerSecond;
-  if(rpm == 0){
-    isPumpOn = false;
-    timerAlarmWrite(timer, 1000000, true);//make it trigger every second and ignore the trigger, in the future make it so the timer actually becomes dissabled
+    timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
   }
-  else{
-    isPumpOn = true;
-    timerAlarmWrite(timer, pumpStepDelay_us/2, true);  		// Match value= 1000000 for 1 sec. delay.
-  }
-}
 
 
 

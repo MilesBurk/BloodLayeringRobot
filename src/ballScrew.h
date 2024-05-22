@@ -1,14 +1,5 @@
-
 #pragma once
-/*
-#ifndef ballScrew_h
-#define ballScrew_h
-#endif
-*/
 #include "Arduino.h"
-
-
-
 
 class ballScrew {
   public:

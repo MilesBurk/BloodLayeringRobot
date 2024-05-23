@@ -62,7 +62,7 @@ void loop() {
     //lockerStorageSequence(); 
 
     //ONLY TEST WITH FIRST TUBE, OTHER VOLUYME SENSORES ARE NOT YET CONNECTED
-    performFillingMotionFor1Tube(1);
+    performFillingMotionFor1Tube(3);
   }
 }
 

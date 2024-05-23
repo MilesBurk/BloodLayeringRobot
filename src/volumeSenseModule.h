@@ -3,9 +3,9 @@
 
 //must change these values once we know which pins will be used for certain.
 #define volumeSensingPin1 23
-#define volumeSensingPin2 23
-#define volumeSensingPin3 23
-#define volumeSensingPin4 23
+#define volumeSensingPin2 13
+#define volumeSensingPin3 25
+#define volumeSensingPin4 26
 
 #define numberOfSensors 4
 

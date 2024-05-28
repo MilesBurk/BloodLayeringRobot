@@ -174,6 +174,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
   
   Pump.setPumpRPM(50);
+  volumeSenseModule::performingFinalFill = true;
   //here you would fill until the volume sensors is triggered.
   while(peristalticPump::isPumpOn){};//basically wait until the pump turns itself off.
 

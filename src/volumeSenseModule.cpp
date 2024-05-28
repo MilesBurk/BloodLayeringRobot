@@ -7,6 +7,8 @@ volatile short volumeSenseModule::volumeSensorPins[] = {volumeSensingPin1, volum
 
 volatile short volumeSenseModule::currentTubeBeingFilled = 1;
 
+volatile bool volumeSenseModule::performingFinalFill = false;
+
 volumeSenseModule::volumeSenseModule(){
     //initialize ESP pins for input
     for(int i = 0; i < numberOfSensors; i++){
@@ -17,7 +19,8 @@ volumeSenseModule::volumeSenseModule(){
 
 void volumeSenseModule::timeToStopPump(){
     //Ensure that it was the intended pin that has triggere the interupt and not one of the other pins
-    if(!digitalRead(volumeSensorPins[currentTubeBeingFilled-1])){
+    if(performingFinalFill && !digitalRead(volumeSensorPins[currentTubeBeingFilled-1])){
         peristalticPump::stopPump();
+        performingFinalFill = false;
     }
 }

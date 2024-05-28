@@ -15,4 +15,5 @@ class volumeSenseModule{
         static void timeToStopPump();
         static volatile short volumeSensorPins[];
         static volatile short currentTubeBeingFilled;
+        static volatile bool performingFinalFill;
 };

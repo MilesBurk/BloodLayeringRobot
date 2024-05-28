@@ -62,7 +62,7 @@ void loop() {
     //lockerStorageSequence(); 
 
     //ONLY TEST WITH FIRST TUBE, OTHER VOLUYME SENSORES ARE NOT YET CONNECTED
-    performFillingMotionFor1Tube(3);
+    performFillingMotionFor1Tube(2);
   }
 }
 
@@ -119,7 +119,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
 
 
-  int entranceDistance_um = 64500;
+  int entranceDistance_um = 63500;
   //slide into tube very slowly as deep as posssible
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
    
@@ -144,9 +144,9 @@ void performFillingMotionFor1Tube(int tubeNumber){
    
    
       //HERE I LET YOU DO DIFFERENT PUMP SEQUENCES AS YOU FILL IT UP
-   int pumpRPMS[] = {10, 12, 14, 16, 22, 25, 30, 0};
+   int pumpRPMS[] = {14, 16, 18, 25, 30, 0};
    //MAKE SURE BOTH THESE ARRAYS HAVE SAME NUMBER OF ELEMENTS!!
-   int delays_ms_Per_pumpingInterval[] = {3000, 3000, 3000, 2000, 1500, 2000, 2000, 1000};
+   int delays_ms_Per_pumpingInterval[] = {30000, 30000, 20000, 20000, 22000, 1000};
 
    int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
    int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;

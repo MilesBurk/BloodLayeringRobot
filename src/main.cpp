@@ -5,9 +5,9 @@
 #include "peristalticPump.h"
 #include "volumeSenseModule.h"
 
-#define runButton 35 
-#define homeButton 32
-#define emergencyStopButton 33
+#define runButton 27 
+#define homeButton 14
+#define emergencyStopButton 13
 
 //THIS roughly means the distance you want to nozzle to be at before entrance into the tube at 60 degrees
 #define heightAbovePivot_um 55000
@@ -73,7 +73,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
   }
-
+  volumeSenseModule::performingFinalFill = false;
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 

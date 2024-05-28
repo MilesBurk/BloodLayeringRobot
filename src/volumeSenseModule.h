@@ -2,8 +2,8 @@
 #include "Arduino.h"
 
 //must change these values once we know which pins will be used for certain.
-#define volumeSensingPin1 23
-#define volumeSensingPin2 13
+#define volumeSensingPin1 32
+#define volumeSensingPin2 33
 #define volumeSensingPin3 25
 #define volumeSensingPin4 26
 

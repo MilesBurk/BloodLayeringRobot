@@ -1,9 +1,9 @@
 #pragma once
 #include "Arduino.h"
 
-#define pumpPin 14
+#define pumpPin 2
 #define pumpMicrosteps 16
-#define pumpDirectionPin 5 //NOTE THAT FORWARD DIRECTION FOR THE PUMP IS TRUE/HIGH
+#define pumpDirectionPin 15 //NOTE THAT FORWARD DIRECTION FOR THE PUMP IS TRUE/HIGH
 
 class peristalticPump{
     public:

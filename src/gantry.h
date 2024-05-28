@@ -5,10 +5,10 @@
 //MUST ADD ALL PIN CONNECTIONS
 #define xStepPin 19
 #define xDirPin 18
-#define yStepPin 17
-#define yDirPin 16
-#define zStepPin 4 
-#define zDirPin 15
+#define yStepPin 5
+#define yDirPin 17
+#define zStepPin 16 
+#define zDirPin 4
 #define xPitch_mm 5
 #define yPitch_mm 5
 #define zPitch_mm 2

@@ -1,7 +1,7 @@
 #pragma once
 #include "Arduino.h"
 
-#define pumpPin 2
+#define pumpPin 23
 #define pumpMicrosteps 16
 #define pumpDirectionPin 15 //NOTE THAT FORWARD DIRECTION FOR THE PUMP IS TRUE/HIGH
 

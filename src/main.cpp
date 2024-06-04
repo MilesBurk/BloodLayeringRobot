@@ -176,7 +176,9 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
   //here you would fill until the volume sensors is triggered.
-  while(peristalticPump::isPumpOn){};//basically wait until the pump turns itself off.
+  while(!volumeSenseModule::timeToStopPump()){};//basically wait until the pump turns itself off.
+  peristalticPump::stopPump();
+  volumeSenseModule::performingFinalFill = false;
 
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
@@ -228,9 +230,12 @@ void initializePushButtons(){
     attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
     
     //Interupt for volume sensor pins.
-    for(int i = 0; i < numberOfSensors; i++){
+    /*
+        for(int i = 0; i < numberOfSensors; i++){
       attachInterrupt(digitalPinToInterrupt(volumeSenseModule::volumeSensorPins[i]), peristalticPump::stopPump, FALLING);
     }
+    */
+
 
     //Interupt for pump control
     timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump

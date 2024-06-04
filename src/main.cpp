@@ -4,6 +4,10 @@
 #include "servoTiltModule.h"
 #include "peristalticPump.h"
 #include "volumeSenseModule.h"
+//For ESP NOW
+#include <esp_now.h>
+#include <WiFi.h>
+//##########################################################
 
 #define runButton 27 
 #define homeButton 14
@@ -16,6 +20,98 @@
 
 #define startingX_mm 0
 #define startingY_mm 63
+
+//# ########################################################################
+//# ##############ESP-NOW Declaration#######################################
+uint8_t broadcastAddress[] = {0xEC,0xDA,0x3B,0x8D,0x2A,0x04};// REPLACE WITH OTHER TRANSCEIVER MAC ADDRESS
+
+// Structure example to send data
+// Must match the receiver structure
+typedef struct Message_Struct {
+  boolean Run;
+  boolean Home;
+  boolean Stop;
+  boolean Abort;
+  byte Tube1;
+  byte Tube2;
+  byte Tube3;
+  byte Tube4;
+  boolean Process; // Default
+} Message_Struct;
+
+Message_Struct message_object;
+char dataRcv[15];
+
+// Important 
+esp_now_peer_info_t peerInfo;
+
+void initializePushButtons();
+void initializeInterupts();
+void stopAllMotors();
+void performFillingMotionforAll4();
+void performFillingMotionFor1Tube(int tubeNumber);
+void lockerStorageSequence();
+
+bool ESPNOWSendStatBool;
+bool PreventSendProcessWhenAbort;
+
+byte DisplayTube1 = 0;
+byte DisplayTube2 = 0;
+byte DisplayTube3 = 0;
+byte DisplayTube4 = 0;
+//# ########################################################################
+// ESP 2.0.3 FW version (Confirmed)
+// Callback function called when data is sent
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {  //Automated function to show data is sent, ignore for now
+  Serial.print("\r\nLast Packet Send Status:\t");
+  if (status == ESP_NOW_SEND_SUCCESS){
+    Serial.print("Delivery Success");
+    ESPNOWSendStatBool = 1;
+  }
+  else{
+    Serial.print("Delivery Fail");
+  }
+}
+void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+  Serial.print("\r\nESP-Now Data Received\t");
+  if (len == sizeof(Message_Struct)) {
+    // Cast the received data pointer to Message_Struct
+    Message_Struct *receivedData = (Message_Struct *)incomingData;
+    
+    // // Extract the received boolean values
+    // boolean Run = receivedData->Run;
+    // boolean Home = receivedData->Home;
+    // boolean Stop = receivedData->Stop;
+    // boolean Abort = receivedData->Abort;
+
+    // Run if Run = 1
+    if(receivedData->Run == 1)
+    {
+      Serial.println("Received Run command");
+      performFillingMotionforAll4();
+    }
+    else
+    {
+      Serial.println("Not Running");
+    }
+
+    // Stop if Abort = 1
+    if(receivedData->Abort == 1)
+    {
+      Serial.println("Received Abort command");
+      stopAllMotors();
+    }
+    else
+    {
+      Serial.println("Not Aborting");
+    }
+
+  } else {
+    Serial.println("Received invalid data length");
+  }
+}
+//# ########################################################################
+//# ########################################################################
 
 volumeSenseModule VolumeSensors = volumeSenseModule();
 peristalticPump Pump = peristalticPump();
@@ -33,6 +129,40 @@ void lockerStorageSequence();
 
 
 void setup() {
+  //# ########################################################################
+  // Set device as a Wi-Fi Station (FOR ESP NOW)
+  // Init Serial Monitor
+ 	Serial.begin(115200);
+
+ 	WiFi.mode(WIFI_STA);
+ 
+  // Init ESP-NOW
+ 	if (esp_now_init() != ESP_OK) {
+ 			Serial.println(F("Error initializing ESP-NOW"));
+ 			return;
+ 	}
+ 	Serial.print(F("Transceiver initialized : "));
+ 	Serial.println(WiFi.macAddress());
+ 	
+ 	// Define callback functions
+ 	esp_now_register_send_cb(OnDataSent);
+ 	esp_now_register_recv_cb(OnDataRecv);
+ 	
+  // Register peer
+ 	memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+ 	peerInfo.channel = 0;
+ 	peerInfo.encrypt = false;
+ 	
+  // Add peer
+ 	if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+ 			Serial.println(F("Failed to add peer"));
+ 			return;
+ 	}
+
+  ESPNOWSendStatBool = 0; //Default is 0, 0 means process incomplete/idle/not in process, 1 = process complete
+  PreventSendProcessWhenAbort = 0; //Default is 0, 0 means normal, 1 means Abort sending Process
+  //# ########################################################################
+
   //Initialize tilt module pwm
   TiltModule.pwm = Adafruit_PWMServoDriver();
   TiltModule.pwm.begin();
@@ -42,7 +172,14 @@ void setup() {
   initializeInterupts();
 }
 
+int count = 0;
 void loop() {
+  if(count == 0)
+  {
+    Serial.println("In First Loop");
+    count++;
+  }
+
   //Perform homing sequence and tilt tube holders to initial angles
   if(digitalRead(homeButton) == HIGH){
     //go to upright angle
@@ -69,6 +206,9 @@ void loop() {
 
 
 void performFillingMotionFor1Tube(int tubeNumber){
+  Serial.println("Performing performFillingMotionFor1Tube...");
+  delay(5000); //Delay for 5s
+
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
@@ -194,6 +334,43 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
 
+  // #############################################################################################
+  // Send ESP-Now Process = 1
+  Serial.println("Tubes Filled !");
+  Serial.println("Sending ESP-NOW Process");
+  ESPNOWSendStatBool = 1;
+
+  message_object.Process = 1;
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) 
+  {
+    if(PreventSendProcessWhenAbort == 1)
+      {
+        Serial.println("Process aborted, not sending Process complete signal.");
+        PreventSendProcessWhenAbort = 0; // Process aborted and No Process signal needs to be sent
+        message_object.Process = 0;
+        ESPNOWSendStatBool = 0;
+        break;
+      }
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(500); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+      {
+        Serial.println("Process confirm sent successful, breaking the loop.");
+        ESPNOWSendStatBool = 0;
+        break;
+      }
+  }
+  message_object.Process = 0;
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  
+  // #############################################################################################
 }
 
 

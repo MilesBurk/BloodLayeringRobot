@@ -17,10 +17,14 @@ volumeSenseModule::volumeSenseModule(){
 
 }
 
-void volumeSenseModule::timeToStopPump(){
+bool volumeSenseModule::timeToStopPump(){
+    return performingFinalFill && !digitalRead(volumeSensorPins[currentTubeBeingFilled-1]);
     //Ensure that it was the intended pin that has triggere the interupt and not one of the other pins
-    if(performingFinalFill && !digitalRead(volumeSensorPins[currentTubeBeingFilled-1])){
+    /*
+        if(performingFinalFill && !digitalRead(volumeSensorPins[currentTubeBeingFilled-1])){
         peristalticPump::stopPump();
         performingFinalFill = false;
     }
+    */
+
 }

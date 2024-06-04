@@ -12,7 +12,7 @@
 class volumeSenseModule{
     public:
         volumeSenseModule();
-        static void timeToStopPump();
+        static bool timeToStopPump();
         static volatile short volumeSensorPins[];
         static volatile short currentTubeBeingFilled;
         static volatile bool performingFinalFill;

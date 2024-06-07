@@ -32,10 +32,7 @@ typedef struct Message_Struct {
   boolean Home;
   boolean Stop;
   boolean Abort;
-  byte Tube1;
-  byte Tube2;
-  byte Tube3;
-  byte Tube4;
+  uint16_t tubes[4];
   boolean Process; // Default
 } Message_Struct;
 
@@ -51,16 +48,15 @@ void stopAllMotors();
 void performFillingMotionforAll4();
 void performFillingMotionFor1Tube(int tubeNumber);
 void lockerStorageSequence();
+void AdjustTubeValueAndSend();
+void ResetTubeVolAndSend();
 
-bool ESPNOWSendStatBool;
+bool ESPNOWSendStatBool ;
 bool PreventSendProcessWhenAbort;
 bool RunSignal = 0;
 bool AbortSignal = 0;
 
-byte DisplayTube1 = 0;
-byte DisplayTube2 = 0;
-byte DisplayTube3 = 0;
-byte DisplayTube4 = 0;
+uint16_t DisplayTubes[4];
 //# ########################################################################
 // ESP 2.0.3 FW version (Confirmed)
 // Callback function called when data is sent
@@ -90,14 +86,14 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     // boolean Stop = receivedData->Stop;
     // boolean Abort = receivedData->Abort; 
 
-    // Serial.println("Run :");
-    // Serial.print(receivedData->Run);
+    Serial.println("Run :");
+    Serial.print(receivedData->Run);
 
-    // Serial.println("Abort :");
-    // Serial.print(receivedData->Abort);
+    Serial.println("Abort :");
+    Serial.print(receivedData->Abort);
 
-    // Serial.println("Run :");
-    // Serial.print(receivedData->Run);
+    Serial.println("Process :");
+    Serial.print(receivedData->Process);
 
     // Run if Run = 1
     if(receivedData->Run == 1)
@@ -115,33 +111,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     if(receivedData->Abort == 1)
     {
       Serial.println("Received Abort command");
-      Serial.println("Process aborted, not sending Process complete signal.");
       AbortSignal = receivedData->Abort;
-      // message_object.Process = PreventSendProcessWhenAbort; // Process aborted and No Process signal needs to be sent
-      // ESPNOWSendStatBool = 0;
-      
-      // int attempt = 0;
-      // for (attempt = 0; attempt < 20; attempt++) 
-      // {
-      //   // Simulate some operation that assigns a value to 'result'
-      //   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-      //   delay(800); // 1000 = 1s
-      //   Serial.println();
-      //   Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-      //   Serial.println();
-      //   // Check if the result is ESP_OK
-      //   if (ESPNOWSendStatBool == 1) 
-      //     {
-      //       Serial.println("Abort Confirm, breaking the loop.");
-      //       Serial.println("Stopping motors");
-      //       ESPNOWSendStatBool = 0;
-      //       break;
-      //     }
-      // }
-
-      // if (attempt == 21) {Serial.println("Max attempts on sending Abort Confirm reached without success.");}
-      // message_object.Abort = 0;
-      // stopAllMotors();
     }
     else
     {
@@ -205,6 +175,8 @@ void setup() {
 
   ESPNOWSendStatBool = 0; //Default is 0, 0 means process incomplete/idle/not in process, 1 = process complete
   PreventSendProcessWhenAbort = 0; //Default is 0, 0 means normal, 1 means Abort sending Process
+  
+  ResetTubeVolAndSend();
   //# ########################################################################
 
   //Initialize tilt module pwm
@@ -245,23 +217,26 @@ void loop() {
   //   //ONLY TEST WITH FIRST TUBE, OTHER VOLUYME SENSORES ARE NOT YET CONNECTED
   //   performFillingMotionFor1Tube(2);
   // }
+  // Serial.println("AbortSignal : ");
+  // Serial.println(AbortSignal);
 
   if(RunSignal == 1)
   {
     Serial.println("Jumping to Run");
     RunSignal = 0;
     performFillingMotionforAll4();
-  }
 
-  if(AbortSignal == 1)
-  {
+    if(AbortSignal == 1)
+    {
+      Serial.println("Aborted Signal received in void loop");
+      ResetTubeVolAndSend();
+      stopAllMotors();
+    }
+    else
+    {
+      Serial.println("Run seccessfully, now quitting if and go to void loop");
+    }
     AbortSignal = 0;
-    Serial.println("Process aborted, not sending Process complete signal.");
-    PreventSendProcessWhenAbort = 0; // Process aborted and No Process signal needs to be sent
-    message_object.Process = 0;
-    ESPNOWSendStatBool = 0;
-    Serial.println("Jumping to Abort");
-    stopAllMotors();
   }
 }
 
@@ -437,25 +412,33 @@ void performFillingMotionFor1Tube(int tubeNumber){
   // Pump.setPumpRPM(0);
   // Pump.setPumpDirection(true);
 
-  delay(1000);
-  Serial.println("1 second");
+  delay(500);
+  Serial.println("0.5 second");
   if (PreventSendProcessWhenAbort) return;
+  DisplayTubes[tubeNumber-1] = 25;
+  // Call tube vol update func
+  AdjustTubeValueAndSend();
 
-  delay(1000);
-  Serial.println("1 second");
+  delay(500);
+  Serial.println("0.5 second");
   if (PreventSendProcessWhenAbort) return;
+  DisplayTubes[tubeNumber-1] = 50;
+  // Call tube vol update func
+  AdjustTubeValueAndSend();
 
-  delay(1000);
-  Serial.println("1 second");
+  delay(500);
+  Serial.println("0.5 second");
   if (PreventSendProcessWhenAbort) return;
+  DisplayTubes[tubeNumber-1] = 75;
+  // Call tube vol update func
+  AdjustTubeValueAndSend();
 
-  delay(1000);
-  Serial.println("1 second");
+  delay(500);
+  Serial.println("0.5 second");
   if (PreventSendProcessWhenAbort) return;
-  
-  delay(1000);
-  Serial.println("1 second");
-  if (PreventSendProcessWhenAbort) return;
+  DisplayTubes[tubeNumber-1] = 100;
+  // Call tube vol update func
+  AdjustTubeValueAndSend();
 
   Serial.println("# ////////////////////////////////////////////////////////////////////");
 }
@@ -475,33 +458,10 @@ void performFillingMotionforAll4(){
   Serial.println("# ////////////////////////////////////////////////////////////////////");
   Serial.println("Tubes Filled !");
   Serial.println("Sending ESP-NOW Process");
-  ESPNOWSendStatBool = 1;
+  ESPNOWSendStatBool = 0;
 
   message_object.Process = 1;
   int attempt = 0;
-  // for (attempt = 0; attempt < 20; attempt++) {
-  //   if(PreventSendProcessWhenAbort == 1)
-  //   {
-  //     Serial.println("Process aborted, not sending Process complete signal.");
-  //     PreventSendProcessWhenAbort = 0; // Process aborted and No Process signal needs to be sent
-  //     message_object.Process = 0;
-  //     ESPNOWSendStatBool = 0;
-  //     break;
-  //   }
-  //   // Simulate some operation that assigns a value to 'result'
-  //   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-  //   delay(500); // 1000 = 1s
-  //   Serial.println();
-  //   Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-  //   Serial.println();
-  //   // Check if the result is ESP_OK
-  //   if (ESPNOWSendStatBool == 1) 
-  //   {
-  //     Serial.println("Process confirm sent successful, breaking the loop.");
-  //     ESPNOWSendStatBool = 0;
-  //     break;
-  //   }
-  // }
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
@@ -517,9 +477,11 @@ void performFillingMotionforAll4(){
       break;
     }
   }
+  AbortSignal = 0;
   message_object.Process = 0;
 
   if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  ResetTubeVolAndSend();
   // #############################################################################################
 }
 
@@ -531,8 +493,7 @@ void stopAllMotors(){
   // Gantry.emergencyStop();
   // Pump.stopPump();  
   Serial.println("Motors stopped");
-
-  message_object.Process = PreventSendProcessWhenAbort; // Process aborted and No Process signal needs to be sent
+  message_object.Process = 0;
   ESPNOWSendStatBool = 0;
   
   int attempt = 0;
@@ -554,7 +515,7 @@ void stopAllMotors(){
   }
 
   if (attempt == 21) {Serial.println("Max attempts on sending Abort Confirm reached without success.");}
-  message_object.Abort = 0;
+  AbortSignal = 0;
 }
 
 void initializePushButtons(){
@@ -584,4 +545,61 @@ void lockerStorageSequence(){
   Gantry.goToAbsPosition_mm(Gantry.getMaxXDisplacement()/2, Gantry.getMaxYDisplacement()/2, Gantry.getMaxZDisplacement(), 10);
 }
 
+void AdjustTubeValueAndSend()
+{
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes));
+  // Send Volume update
+  ESPNOWSendStatBool = 0;
+  int attempt;  
+  for (attempt = 0; attempt < 20; attempt++) {
+      // Simulate some operation that assigns a value to 'result'
+      esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+      delay(500); // 1000 = 1s
+      Serial.println();
+      Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+      Serial.println();
+      // Check if the result is ESP_OK
+      if (ESPNOWSendStatBool == 1) 
+      {
+        Serial.println("Tube volume update sent successful, breaking the loop.");
+        ESPNOWSendStatBool = 0;
+        break;
+      }
+    }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  
+}
+
+void ResetTubeVolAndSend()
+{
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  for(int i = 0; i<4 ; i++)
+  {
+    DisplayTubes[i] = 0;
+  }
+  memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes));
+  // Send Volume update
+  ESPNOWSendStatBool = 0;
+  int attempt;  
+  for (attempt = 0; attempt < 20; attempt++) {
+      // Simulate some operation that assigns a value to 'result'
+      esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+      delay(500); // 1000 = 1s
+      Serial.println();
+      Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+      Serial.println();
+      // Check if the result is ESP_OK
+      if (ESPNOWSendStatBool == 1) 
+      {
+        Serial.println("Tube volume RESET update sent successful, breaking the loop.");
+        ESPNOWSendStatBool = 0;
+        break;
+      }
+    }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  
+}
 

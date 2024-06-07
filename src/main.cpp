@@ -619,16 +619,48 @@ void ResetTubeVolAndSend()
 void performFastFillingMotionForAll4(){
     //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
+    if (PreventSendProcessWhenAbort) return;
     performFastFillingMotionFor1Tube(i+1);
   }
 
+  if (PreventSendProcessWhenAbort) return;
   //once it is finished then go to top left
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
+  // #############################################################################################
+  // Send ESP-Now Process = 1
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Tubes Filled !");
+  Serial.println("Sending ESP-NOW Process");
+  ESPNOWSendStatBool = 0;
+
+  message_object.Process = 1;
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(500); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Process confirm sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+  AbortSignal = 0;
+  message_object.Process = 0;
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  ResetTubeVolAndSend();
+  // #############################################################################################
 }
 
 //for testing purposes only
 void performFastFillingMotionFor1Tube(int tubeNumber){
-   Serial.println("Performing performFillingMotionFor1Tube...");
+   Serial.println("Performing performFastFillingMotionFor1Tube...");
   if (PreventSendProcessWhenAbort) return; // Uncomment if needed
 
   delay(1000); //Delay for 5s

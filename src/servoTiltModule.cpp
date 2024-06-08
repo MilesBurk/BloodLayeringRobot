@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "servoTiltModule.h"
 
+volatile bool servoTiltModule::isForcedStop = false;
 
 servoTiltModule::servoTiltModule(){
 
@@ -31,7 +32,7 @@ void servoTiltModule::setAllTubesToAngle(int angle_deg){
 //offset is in degrees and is used to calibrate to find true zero position for consistency accross pieces
 void servoTiltModule::goDirectlyToTubeAngle(int angle, int tubeNum){
   //first check to make sure the requested tube is valid
-  if(tubeNum < 1 || tubeNum > NUM_TUBES){
+  if(tubeNum < 1 || tubeNum > NUM_TUBES || isForcedStop){
     return;
   }
   angle = angle + tubeOffsets[tubeNum-1];
@@ -43,7 +44,7 @@ void servoTiltModule::goDirectlyToTubeAngle(int angle, int tubeNum){
 
 void servoTiltModule::sweepTubeToAngle(int angle, float time_s, int tubeNum){
 
-  if(tubeNum < 1 || tubeNum > NUM_TUBES){
+  if(tubeNum < 1 || tubeNum > NUM_TUBES || isForcedStop){
     return;
   }
   angle = angle + tubeOffsets[tubeNum-1];
@@ -58,6 +59,7 @@ void servoTiltModule::sweepTubeToAngle(int angle, float time_s, int tubeNum){
     int ticks = diff/minRes;
     delay_ms = 1000*time_s/ticks;
     for(int i = 0; i < ticks; i++){
+          if(isForcedStop){return;};
           pulseWidth = int(float(pulse_wide)/ 1000000 * freq * 4096);
           pwm.setPWM(tubePins[tubeNum-1], 0, pulseWidth);
           delay(delay_ms);
@@ -69,6 +71,7 @@ void servoTiltModule::sweepTubeToAngle(int angle, float time_s, int tubeNum){
     int ticks = -diff/minRes;
     delay_ms = 1000*time_s/ticks;
     for(int i = 0; i < ticks; i++){
+      if(isForcedStop){return;};
       pulseWidth = int(float(pulse_wide)/ 1000000 * freq * 4096);
       pwm.setPWM(tubePins[tubeNum-1], 0, pulseWidth);
       delay(delay_ms);

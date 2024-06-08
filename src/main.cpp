@@ -52,6 +52,7 @@ void performFastFillingMotionForAll4();
 void lockerStorageSequence();
 void AdjustTubeValueAndSend();
 void ResetTubeVolAndSend();
+void delayWithAbort_ms(int delayTime_ms);
 
 bool ESPNOWSendStatBool ;
 bool PreventSendProcessWhenAbort;
@@ -114,6 +115,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     {
       Serial.println("Received Abort command");
       AbortSignal = receivedData->Abort;
+      stopAllMotors();
     }
     else
     {
@@ -230,6 +232,9 @@ void loop() {
     TiltModule.setAllTubesToAngle(0);
     delay(1000);
     Gantry.homeGantry();
+    Pump.isForcedStop = false;
+    TiltModule.isForcedStop = false;
+
     
     //go to loading angle
     int loadingAngle = -30;
@@ -256,86 +261,71 @@ void loop() {
 // Modified performFillingMotionFor1Tube function
 void performFillingMotionFor1Tube(int tubeNumber){
   Serial.println("Performing performFillingMotionFor1Tube...");
-  if (PreventSendProcessWhenAbort) return; // Uncomment if needed
 
-  delay(5000); //Delay for 5s
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(5000); //Delay for 5s
 
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
   }
-  if (PreventSendProcessWhenAbort) return;
 
   volumeSenseModule::performingFinalFill = false;
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
   //only for testing get rid after
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
-  delay(3000);
+  delayWithAbort_ms(3000);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
 
-  if (PreventSendProcessWhenAbort) return;
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
-  if (PreventSendProcessWhenAbort) return;
 
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
-  if (PreventSendProcessWhenAbort) return;
 
   //Offset in z direction so that nozzle travels along bottom side of tube as opposed to along the center of thubes axis
   int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
-  if (PreventSendProcessWhenAbort) return;
 
   //note that I 57000 ensures contact but maybe even  bit too much bending of the nozzle
   //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
   int intialHeightAboveAxis = 55000;
-  if (PreventSendProcessWhenAbort) return;
   
   //try combining moves int o1 diagonal pass 
   Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
 
-  if (PreventSendProcessWhenAbort) return;
-  delay(1000);
+  delayWithAbort_ms(1000);
 
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
   //FIRST MOVE TUBE 5 degs so there are no collisions then move back
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
 
   int entranceDistance_um = 63500;
   //slide into tube very slowly as deep as posssible
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
    
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
-  if (PreventSendProcessWhenAbort) return;
 
   //initizl pump prime
   Pump.setPumpRPM(300);
-  delay(1900);
+  delayWithAbort_ms(1900);
   Pump.setPumpRPM(0);
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
   Pump.setPumpRPM(10);
-  delay(30000);
+  delayWithAbort_ms(30000);
 
-  if (PreventSendProcessWhenAbort) return;
 
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
@@ -353,11 +343,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
   int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;
 
-  if (PreventSendProcessWhenAbort) return;
-
   for(int i = 0; i < numberOfPumpingSequencesWhileExitingTube; i++){
-    if (PreventSendProcessWhenAbort) return;
-
     //set new pumping speed and slide gantry up tube, take sliding time as delay before new pumping speed
     Pump.setPumpRPM(pumpRPMS[i]);
     Gantry.goToRelativePosition(0, exitDistancePerPumpSequence_um*sin(PI*firstFillAngle/float(180)), exitDistancePerPumpSequence_um*cos(PI*firstFillAngle/float(180)), delays_ms_Per_pumpingInterval[i]);
@@ -366,86 +352,44 @@ void performFillingMotionFor1Tube(int tubeNumber){
   //take the nozzle out by traveling straight up.
   Gantry.goToRelativePosition(0, 0, 40000, 5000);
 
-  if (PreventSendProcessWhenAbort) return;
-
   // straighten out 
   int finalFillAngle = -10;
   TiltModule.sweepTubeToAngle(finalFillAngle, 1, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
-
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
 
-  if (PreventSendProcessWhenAbort) return;
-
   int depthBelowTubeTop_um = 25000;//this is for the depth along the tube wall you want the final fill position to be at.
-
-  if (PreventSendProcessWhenAbort) return;
 
   //take the nozzle to tube wall, old logic
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
-
-  if (PreventSendProcessWhenAbort) return;
 
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
 
   //here you would fill until the volume sensors is triggered.
-  while(!volumeSenseModule::timeToStopPump()){
-    if (PreventSendProcessWhenAbort) {
-      peristalticPump::stopPump();
-      return;
-    }
-  };//basically wait until the pump turns itself off.
+  while(!volumeSenseModule::timeToStopPump() && !AbortSignal){};
+  //basically wait until the pump turns itself off.
 
   peristalticPump::stopPump();
   volumeSenseModule::performingFinalFill = false;
 
-  if (PreventSendProcessWhenAbort) return;
-
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
-
-  if (PreventSendProcessWhenAbort) return;
 
   //go back to center
   TiltModule.sweepTubeToAngle(0, 2, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
-
   //will need to be changed so it just runs once at the end of filling four tubes
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
-  delay(3000);
+  delayWithAbort_ms(3000);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
 
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 25;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 50;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 75;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  delay(500);
+  delayWithAbort_ms(500);
   Serial.println("0.5 second");
   if (PreventSendProcessWhenAbort) return;
   DisplayTubes[tubeNumber-1] = 100;
@@ -500,10 +444,10 @@ void performFillingMotionforAll4(){
 void stopAllMotors(){
   Serial.println("# ////////////////////////////////////////////////////////////////////");
   Serial.print("In stopAllMotors");
-  Serial.println("2 second delay");
-  delay(2000);
   Gantry.emergencyStop();
   Pump.stopPump(); 
+  Pump.isForcedStop = true;
+  TiltModule.isForcedStop = true;
 
   Serial.println("Motors stopped");
   message_object.Process = 0;
@@ -538,21 +482,12 @@ void initializePushButtons(){
   pinMode(emergencyStopButton, INPUT);
 }
 
-  void initializeInterupts(){
-    //Add external interupt for emergency stop button  
-    attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
-    
-    //Interupt for volume sensor pins.
-    /*
-        for(int i = 0; i < numberOfSensors; i++){
-      attachInterrupt(digitalPinToInterrupt(volumeSenseModule::volumeSensorPins[i]), peristalticPump::stopPump, FALLING);
-    }
-    */
-
-
-    //Interupt for pump control
-    timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
-  }
+void initializeInterupts(){
+  //Add external interupt for emergency stop button  
+  attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
+  //Interupt for pump control
+  timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
+}
 
 void lockerStorageSequence(){
   Gantry.goToAbsPosition_mm(Gantry.getMaxXDisplacement()/2, Gantry.getMaxYDisplacement()/2, Gantry.getMaxZDisplacement(), 10);
@@ -619,7 +554,6 @@ void ResetTubeVolAndSend()
 void performFastFillingMotionForAll4(){
     //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
-    if (PreventSendProcessWhenAbort) return;
     performFastFillingMotionFor1Tube(i+1);
   }
 
@@ -661,86 +595,71 @@ void performFastFillingMotionForAll4(){
 //for testing purposes only
 void performFastFillingMotionFor1Tube(int tubeNumber){
    Serial.println("Performing performFastFillingMotionFor1Tube...");
-  if (PreventSendProcessWhenAbort) return; // Uncomment if needed
 
-  delay(1000); //Delay for 5s
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000); //Delay for 5s
 
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
   }
-  if (PreventSendProcessWhenAbort) return;
 
   volumeSenseModule::performingFinalFill = false;
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
   //only for testing get rid after
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
-  delay(1000);
+  delayWithAbort_ms(1000);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
 
-  if (PreventSendProcessWhenAbort) return;
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
-  delay(1000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(1000);
 
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
-  if (PreventSendProcessWhenAbort) return;
 
   //move to startign position for angle 60 deg, split up in 2 motions to avoid collision
   int firstFillAngle = 60;
-  if (PreventSendProcessWhenAbort) return;
 
   //Offset in z direction so that nozzle travels along bottom side of tube as opposed to along the center of thubes axis
   int zOffsetForBottomOfTube = tubeWidth_mm*1000/(2*sin(firstFillAngle*PI/float(180)));
-  if (PreventSendProcessWhenAbort) return;
 
   //note that I 57000 ensures contact but maybe even  bit too much bending of the nozzle
   //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
   int intialHeightAboveAxis = 55000;
-  if (PreventSendProcessWhenAbort) return;
   
   //try combining moves int o1 diagonal pass 
   Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 000);    
 
-  if (PreventSendProcessWhenAbort) return;
-  delay(1000);
+  delayWithAbort_ms(1000);
 
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
   //FIRST MOVE TUBE 5 degs so there are no collisions then move back
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
 
   int entranceDistance_um = 63500;
   //slide into tube very slowly as deep as posssible
   Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 000);
    
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
-  if (PreventSendProcessWhenAbort) return;
 
   //initizl pump prime
   Pump.setPumpRPM(300);
-  delay(500);
+  delayWithAbort_ms(500);
   Pump.setPumpRPM(0);
-  delay(500);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(500);
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
   Pump.setPumpRPM(10);
-  delay(1000);
+  delayWithAbort_ms(1000);
 
-  if (PreventSendProcessWhenAbort) return;
 
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
@@ -758,10 +677,8 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   int numberOfPumpingSequencesWhileExitingTube = sizeof(pumpRPMS)/sizeof(int);
   int exitDistancePerPumpSequence_um = exitDistance_um/numberOfPumpingSequencesWhileExitingTube;
 
-  if (PreventSendProcessWhenAbort) return;
 
   for(int i = 0; i < numberOfPumpingSequencesWhileExitingTube; i++){
-    if (PreventSendProcessWhenAbort) return;
 
     //set new pumping speed and slide gantry up tube, take sliding time as delay before new pumping speed
     Pump.setPumpRPM(pumpRPMS[i]);
@@ -771,88 +688,45 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   //take the nozzle out by traveling straight up.
   Gantry.goToRelativePosition(0, 0, 40000, 000);
 
-  if (PreventSendProcessWhenAbort) return;
-
   // straighten out 
   int finalFillAngle = -10;
   TiltModule.sweepTubeToAngle(finalFillAngle, 1, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
-
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
 
-  if (PreventSendProcessWhenAbort) return;
-
   int depthBelowTubeTop_um = 25000;//this is for the depth along the tube wall you want the final fill position to be at.
-
-  if (PreventSendProcessWhenAbort) return;
 
   //take the nozzle to tube wall, old logic
   Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 000);
-
-  if (PreventSendProcessWhenAbort) return;
 
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
 
   //here you would fill until the volume sensors is triggered.
-  while(!volumeSenseModule::timeToStopPump()){
-    if (PreventSendProcessWhenAbort) {
-      peristalticPump::stopPump();
-      return;
-    }
-  };//basically wait until the pump turns itself off.
+  while(!volumeSenseModule::timeToStopPump() && !AbortSignal){};
+  //basically wait until the pump turns itself off.
 
   peristalticPump::stopPump();
   volumeSenseModule::performingFinalFill = false;
 
-  if (PreventSendProcessWhenAbort) return;
-
   //go to center above the tube
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
-
-  if (PreventSendProcessWhenAbort) return;
 
   //go back to center
   TiltModule.sweepTubeToAngle(0, 1, tubeNumber);
 
-  if (PreventSendProcessWhenAbort) return;
-
   //will need to be changed so it just runs once at the end of filling four tubes
-  delay(000);
-  if (PreventSendProcessWhenAbort) return;
+  delayWithAbort_ms(000);
 
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
-  delay(500);
+  delayWithAbort_ms(500);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
 
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 25;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 50;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  // delay(500);
-  // Serial.println("0.5 second");
-  // if (PreventSendProcessWhenAbort) return;
-  // DisplayTubes[tubeNumber-1] = 75;
-  // // Call tube vol update func
-  // AdjustTubeValueAndSend();
-
-  delay(500);
+  delayWithAbort_ms(500);
   Serial.println("0.5 second");
-  if (PreventSendProcessWhenAbort) return;
   DisplayTubes[tubeNumber-1] = 100;
   // Call tube vol update func
   AdjustTubeValueAndSend();
@@ -860,3 +734,11 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   Serial.println("# ////////////////////////////////////////////////////////////////////");
 }
 
+void delayWithAbort_ms(int delayTime_ms){
+  for(int i = 0; i < delayTime_ms; i++){
+    delay(1);
+    if(AbortSignal){
+      return;
+    }
+  }  
+}

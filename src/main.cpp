@@ -58,6 +58,7 @@ bool ESPNOWSendStatBool ;
 bool PreventSendProcessWhenAbort;
 volatile bool RunSignal = 0;
 volatile bool AbortSignal = 0;
+volatile bool aborted = 0;
 
 uint16_t DisplayTubes[4];
 //# ########################################################################
@@ -229,11 +230,14 @@ void loop() {
     Serial.println("Jumping to Run");
 
     //go to upright angle
+    AbortSignal = 0;
+    aborted = 0;
+    Pump.isForcedStop = false;
+    TiltModule.isForcedStop = false;
     TiltModule.setAllTubesToAngle(0);
     delay(1000);
     Gantry.homeGantry();
-    Pump.isForcedStop = false;
-    TiltModule.isForcedStop = false;
+
 
     
     //go to loading angle
@@ -242,6 +246,8 @@ void loop() {
 
     RunSignal = 0;
     performFastFillingMotionForAll4();
+    aborted = 0;
+
 
     if(AbortSignal == 1)
     {
@@ -367,8 +373,9 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
 
+  Serial.println("Reached above the volume line");
   //here you would fill until the volume sensors is triggered.
-  while(!volumeSenseModule::timeToStopPump() && !AbortSignal){};
+  while(!volumeSenseModule::timeToStopPump() && !aborted){};
   //basically wait until the pump turns itself off.
 
   peristalticPump::stopPump();
@@ -446,6 +453,7 @@ void stopAllMotors(){
   Serial.print("In stopAllMotors");
   Gantry.emergencyStop();
   Pump.stopPump(); 
+  aborted = 1;
   Pump.isForcedStop = true;
   TiltModule.isForcedStop = true;
 
@@ -458,7 +466,7 @@ void stopAllMotors(){
   {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(800); // 1000 = 1s
+    //delay(800); // 1000 = 1s
     Serial.println();
     Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
     Serial.println();
@@ -702,9 +710,9 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
 
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
-
+  Serial.println("Reached above the volume line");
   //here you would fill until the volume sensors is triggered.
-  while(!volumeSenseModule::timeToStopPump() && !AbortSignal){};
+  while(!volumeSenseModule::timeToStopPump() && !aborted){};
   //basically wait until the pump turns itself off.
 
   peristalticPump::stopPump();
@@ -737,7 +745,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
 void delayWithAbort_ms(int delayTime_ms){
   for(int i = 0; i < delayTime_ms; i++){
     delay(1);
-    if(AbortSignal){
+    if(aborted){
       return;
     }
   }  

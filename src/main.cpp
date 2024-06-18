@@ -225,7 +225,7 @@ void loop() {
   // Serial.println("AbortSignal : ");
   // Serial.println(AbortSignal);
 
-  if(RunSignal == 1)
+  if(RunSignal == 1 || digitalRead(runButton))
   { 
     Serial.println("Jumping to Run");
 
@@ -428,7 +428,7 @@ void performFillingMotionforAll4(){
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(500); // 1000 = 1s
+    delay(50); // 1000 = 1s
     Serial.println();
     Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
     Serial.println();
@@ -511,7 +511,7 @@ void AdjustTubeValueAndSend()
   for (attempt = 0; attempt < 20; attempt++) {
       // Simulate some operation that assigns a value to 'result'
       esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-      delay(500); // 1000 = 1s
+      delay(00); // 1000 = 1s
       Serial.println();
       Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
       Serial.println();

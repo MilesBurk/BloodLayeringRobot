@@ -13,6 +13,8 @@
 #define homeButton 14
 #define emergencyStopButton 13
 
+#define estoppin 35
+
 //THIS roughly means the distance you want to nozzle to be at before entrance into the tube at 60 degrees
 #define heightAbovePivot_um 55000
 #define tubeWidth_mm 27
@@ -34,6 +36,7 @@ typedef struct Message_Struct {
   boolean Abort;
   uint16_t tubes[4];
   boolean Process; // Default
+  boolean estop;
 } Message_Struct;
 
 Message_Struct message_object;
@@ -53,12 +56,17 @@ void lockerStorageSequence();
 void AdjustTubeValueAndSend();
 void ResetTubeVolAndSend();
 void delayWithAbort_ms(int delayTime_ms);
+void EStopDisengage();
+void EStopEngage();
+void EStopUpdateState();
 
 bool ESPNOWSendStatBool ;
-bool PreventSendProcessWhenAbort;
+bool AbortSignal = 0;
 volatile bool RunSignal = 0;
-volatile bool AbortSignal = 0;
 volatile bool aborted = 0;
+
+volatile bool estopSignal = 0; // Received from interrupt, Flag to update in void
+volatile bool estopstatus = 0; // Current E-stop status
 
 uint16_t DisplayTubes[4];
 //# ########################################################################
@@ -75,14 +83,14 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {  //Auto
   }
 }
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
-  Serial.println("# ////////////////////////////////////////////////////////////////////");
-  Serial.print("\r\nESP-Now Data Received\t");
+  Serial.print("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("\r\nESP-Now Data Received\t");
   if (len == sizeof(Message_Struct)) {
     // Cast the received data pointer to Message_Struct
     Message_Struct *receivedData = (Message_Struct *)incomingData;
 
-    // Set PreventSendProcessWhenAbort based on received Abort value
-    PreventSendProcessWhenAbort = receivedData->Abort;
+    // Set AbortSignal based on received Abort value
+    // AbortSignal = receivedData->Abort;
 
     // // Extract the received boolean values
     // boolean Run = receivedData->Run;
@@ -90,14 +98,14 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     // boolean Stop = receivedData->Stop;
     // boolean Abort = receivedData->Abort; 
 
-    Serial.println("Run :");
-    Serial.print(receivedData->Run);
+    Serial.print("Run :");
+    Serial.println(receivedData->Run);
 
-    Serial.println("Abort :");
-    Serial.print(receivedData->Abort);
+    Serial.print("Abort :");
+    Serial.println(receivedData->Abort);
 
-    Serial.println("Process :");
-    Serial.print(receivedData->Process);
+    Serial.print("Process :");
+    Serial.println(receivedData->Process);
 
     // Run if Run = 1
     if(receivedData->Run == 1)
@@ -115,8 +123,8 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     if(receivedData->Abort == 1)
     {
       Serial.println("Received Abort command");
-      AbortSignal = receivedData->Abort;
-      stopAllMotors();
+      AbortSignal = 1;
+      // stopAllMotors();
     }
     else
     {
@@ -179,7 +187,7 @@ void setup() {
  	}
 
   ESPNOWSendStatBool = 0; //Default is 0, 0 means process incomplete/idle/not in process, 1 = process complete
-  PreventSendProcessWhenAbort = 0; //Default is 0, 0 means normal, 1 means Abort sending Process
+  AbortSignal = 0; //Default is 0, 0 means normal, 1 means Abort sending Process
   
   ResetTubeVolAndSend();
   //# ########################################################################
@@ -225,20 +233,37 @@ void loop() {
   // Serial.println("AbortSignal : ");
   // Serial.println(AbortSignal);
 
+  // E-stop Flag Check
+  if(estopSignal == 1 && estopstatus == 0)
+  {
+    Serial.println("EStop Signal flagged as 1.");
+    // Engage estop
+    estopstatus = 1;
+    AbortSignal = 1;
+    EStopEngage();
+    ResetTubeVolAndSend();
+    stopAllMotors();
+  }
+  else if(estopSignal == 0 && estopstatus == 1)
+  {
+    // Disengage estop
+    EStopDisengage();
+    estopstatus = 0;
+  }
+  //
+
   if(RunSignal == 1 || digitalRead(runButton))
   { 
     Serial.println("Jumping to Run");
 
     //go to upright angle
-    AbortSignal = 0;
+    // AbortSignal = 0;
     aborted = 0;
     Pump.isForcedStop = false;
     TiltModule.isForcedStop = false;
     TiltModule.setAllTubesToAngle(0);
     delay(1000);
     Gantry.homeGantry();
-
-
     
     //go to loading angle
     int loadingAngle = -30;
@@ -249,9 +274,14 @@ void loop() {
     aborted = 0;
 
 
-    if(AbortSignal == 1)
+    if(AbortSignal == 1 || estopSignal == 1)
     {
-      Serial.println("Aborted Signal received in void loop");
+      Serial.println("Aborted/Estop Signal received in void loop");
+      if(estopSignal == 1)
+      {
+        estopstatus = 1;
+        EStopEngage();
+      }
       ResetTubeVolAndSend();
       stopAllMotors();
     }
@@ -398,7 +428,8 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   delayWithAbort_ms(500);
   Serial.println("0.5 second");
-  if (PreventSendProcessWhenAbort) return;
+  if (AbortSignal || estopSignal == 1) return;
+
   DisplayTubes[tubeNumber-1] = 100;
   // Call tube vol update func
   AdjustTubeValueAndSend();
@@ -410,10 +441,12 @@ void performFillingMotionFor1Tube(int tubeNumber){
 void performFillingMotionforAll4(){
   //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
-    if (PreventSendProcessWhenAbort) return;
+    if (AbortSignal || estopSignal == 1) return;
+
     performFillingMotionFor1Tube(i+1);
   }
-  if (PreventSendProcessWhenAbort) return;
+  if (AbortSignal || estopSignal == 1) return;
+
   //once it is finished then go to top left
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
   // #############################################################################################
@@ -473,13 +506,13 @@ void stopAllMotors(){
     // Check if the result is ESP_OK
     if (ESPNOWSendStatBool == 1) 
       {
-        Serial.println("Abort Confirm, breaking the loop.");
+        Serial.println("Abort/Stop Motor Confirm, breaking the loop.");
         ESPNOWSendStatBool = 0;
         break;
       }
   }
 
-  if (attempt == 21) {Serial.println("Max attempts on sending Abort Confirm reached without success.");}
+  if (attempt == 21) {Serial.println("Max attempts on sending Abort/Stop Motor Confirm reached without success.");}
   AbortSignal = 0;
 }
 
@@ -488,11 +521,103 @@ void initializePushButtons(){
   pinMode(runButton, INPUT);
   pinMode(homeButton, INPUT);
   pinMode(emergencyStopButton, INPUT);
+  pinMode(estoppin, INPUT);
+}
+
+void EStopUpdateState() // Newly Added
+{ 
+  if(digitalRead(estoppin))
+  {
+    // When High
+    estopSignal = 1;
+    Serial.println("E-Stop State changed to Engaged!");
+  }
+  else{
+    // When Low
+    estopSignal = 0;
+    Serial.println("E-Stop State changed to disengaged!");
+  }
+}
+
+void EStopEngage()
+{
+  // #############################################################################################
+  // Send estop = 1
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("E-Stop Engaged!!");
+  Serial.println("Sending ESP-NOW Process");
+  ESPNOWSendStatBool = 0;
+
+  message_object.estop = 1;
+  message_object.Run = 0;
+  message_object.Home = 0;
+  message_object.Stop = 0;
+  message_object.Abort = 0;
+  message_object.Process = 0; 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(500); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("E-Stop engaged sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending E-Stop engaged reached without success.");}
+  ResetTubeVolAndSend();
+}
+
+void EStopDisengage(){ // Newly Added
+  // #############################################################################################
+  // Send estop = 1
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("E-Stop disengaged!!");
+  Serial.println("Sending ESP-NOW Process");
+  ESPNOWSendStatBool = 0;
+
+  message_object.estop = 0;
+  message_object.Run = 0;
+  message_object.Home = 0;
+  message_object.Stop = 0;
+  message_object.Abort = 0;
+  message_object.Process = 0; 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(500); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("E-Stop disengaged sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending E-Stop disengaged reached without success.");}
+  ResetTubeVolAndSend();
 }
 
 void initializeInterupts(){
   //Add external interupt for emergency stop button  
   attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
+
+  attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, CHANGE); // Called When EStop has a changing state
+
   //Interupt for pump control
   timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
 }
@@ -563,9 +688,11 @@ void performFastFillingMotionForAll4(){
     //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
     performFastFillingMotionFor1Tube(i+1);
+    if (AbortSignal || estopSignal == 1) return;
   }
 
-  if (PreventSendProcessWhenAbort) return;
+  if (AbortSignal || estopSignal == 1) return;
+
   //once it is finished then go to top left
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
   // #############################################################################################
@@ -614,7 +741,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   volumeSenseModule::performingFinalFill = false;
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
-
+  if (AbortSignal || estopSignal == 1) return;  
   //only for testing get rid after
   delayWithAbort_ms(1000);
 
@@ -641,7 +768,8 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   //note that I 57000 ensures contact but maybe even  bit too much bending of the nozzle
   //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
   int intialHeightAboveAxis = 55000;
-  
+
+  if (AbortSignal || estopSignal == 1) return;
   //try combining moves int o1 diagonal pass 
   Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 000);    
 
@@ -668,7 +796,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpRPM(10);
   delayWithAbort_ms(1000);
 
-
+  if (AbortSignal || estopSignal == 1) return;
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
   ///find distance to move out of the tube
@@ -692,7 +820,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
     Pump.setPumpRPM(pumpRPMS[i]);
     Gantry.goToRelativePosition(0, exitDistancePerPumpSequence_um*sin(PI*firstFillAngle/float(180)), exitDistancePerPumpSequence_um*cos(PI*firstFillAngle/float(180)), delays_ms_Per_pumpingInterval[i]);
   }
-
+  if (AbortSignal || estopSignal == 1) return;
   //take the nozzle out by traveling straight up.
   Gantry.goToRelativePosition(0, 0, 40000, 000);
 
@@ -726,7 +854,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
 
   //will need to be changed so it just runs once at the end of filling four tubes
   delayWithAbort_ms(000);
-
+  if (AbortSignal || estopSignal == 1) return;
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
   delayWithAbort_ms(500);

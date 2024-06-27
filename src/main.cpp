@@ -4,6 +4,7 @@
 #include "servoTiltModule.h"
 #include "peristalticPump.h"
 #include "volumeSenseModule.h"
+#include "esp32-hal-timer.h"
 //For ESP NOW
 #include <esp_now.h>
 #include <WiFi.h>
@@ -59,6 +60,10 @@ void delayWithAbort_ms(int delayTime_ms);
 void EStopDisengage();
 void EStopEngage();
 void EStopUpdateState();
+void IRAM_ATTR Tube_Vol_Timer();
+void disableTimer();
+void startTimer();
+
 
 bool ESPNOWSendStatBool ;
 bool AbortSignal = 0;
@@ -69,6 +74,12 @@ volatile bool estopSignal = 0; // Received from interrupt, Flag to update in voi
 volatile bool estopstatus = 0; // Current E-stop status
 
 uint16_t DisplayTubes[4];
+uint16_t tube_vol_temp = 0;
+int current_tube_num = 0;
+
+hw_timer_t *Display_Vol_Timer_ISR = NULL;
+const unsigned long interval = 20000;  // Interval in milliseconds (20 seconds)
+
 //# ########################################################################
 // ESP 2.0.3 FW version (Confirmed)
 // Callback function called when data is sent
@@ -199,6 +210,16 @@ void setup() {
   
   initializePushButtons();
   initializeInterupts();
+
+  // Initialize the timer
+  Display_Vol_Timer_ISR = timerBegin(0, 80, true);  // Timer 0, prescaler 80 (1 tick = 1 microsecond), count up
+  // Attach the interrupt function to the timer
+  timerAttachInterrupt(Display_Vol_Timer_ISR, &Tube_Vol_Timer, true);
+  // Set the alarm to trigger every 'interval' microseconds
+  timerAlarmWrite(Display_Vol_Timer_ISR, interval * 1000, true);
+  // Enable the timer alarm
+  timerAlarmEnable(Display_Vol_Timer_ISR);
+  startTimer();
 }
 
 int count = 0;
@@ -687,6 +708,7 @@ void ResetTubeVolAndSend()
 void performFastFillingMotionForAll4(){
     //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
+    current_tube_num = i+1;
     performFastFillingMotionFor1Tube(i+1);
     if (AbortSignal || estopSignal == 1) return;
   }
@@ -799,6 +821,8 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   if (AbortSignal || estopSignal == 1) return;
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
+  startTimer(); //Start Timer AKA generate tube Vol
+
   ///find distance to move out of the tube
   //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
   int exitDistance_um = entranceDistance_um - 11000;
@@ -862,6 +886,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpDirection(true);
 
   delayWithAbort_ms(500);
+  disableTimer();
   Serial.println("0.5 second");
   DisplayTubes[tubeNumber-1] = 100;
   // Call tube vol update func
@@ -877,4 +902,37 @@ void delayWithAbort_ms(int delayTime_ms){
       return;
     }
   }  
+}
+
+// Timer ISR function to send "hello" over Serial
+void IRAM_ATTR Tube_Vol_Timer() {
+  if(DisplayTubes[current_tube_num] == 100)
+  {
+    Serial.println("Already reached 100, turning off Timer");
+    disableTimer();
+  }
+  else
+  {
+    DisplayTubes[current_tube_num]++;
+  }
+  
+  Serial.print("Value of tube_vol_temp");
+  Serial.println(DisplayTubes[current_tube_num]);
+  AdjustTubeValueAndSend();
+  Serial.println("# ########################################");
+}
+
+void disableTimer() {
+  // Disable the timer alarm
+  Serial.print("# ########################################");
+  Serial.println('Timer Stopped');
+  timerAlarmDisable(Display_Vol_Timer_ISR);
+}
+
+void startTimer() {
+  // Enable the timer alarm
+  Serial.print("# ########################################");
+  Serial.println('Timer Started');
+  current_tube_num = 0;
+  timerAlarmEnable(Display_Vol_Timer_ISR);
 }

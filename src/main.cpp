@@ -219,7 +219,7 @@ void setup() {
   timerAlarmWrite(Display_Vol_Timer_ISR, interval * 1000, true);
   // Enable the timer alarm
   timerAlarmEnable(Display_Vol_Timer_ISR);
-  startTimer();
+  // startTimer();
 }
 
 int count = 0;
@@ -650,7 +650,7 @@ void lockerStorageSequence(){
 void AdjustTubeValueAndSend()
 {
   Serial.println("# ////////////////////////////////////////////////////////////////////");
-  memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes));
+  memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes)); // Diretly copy and send from DisplayTubes[]
   // Send Volume update
   ESPNOWSendStatBool = 0;
   int attempt;  
@@ -915,8 +915,7 @@ void IRAM_ATTR Tube_Vol_Timer() {
   {
     DisplayTubes[current_tube_num]++;
   }
-  
-  Serial.print("Value of tube_vol_temp");
+  Serial.print("Value of current tube : ");
   Serial.println(DisplayTubes[current_tube_num]);
   AdjustTubeValueAndSend();
   Serial.println("# ########################################");

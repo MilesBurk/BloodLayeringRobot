@@ -38,6 +38,7 @@ typedef struct Message_Struct {
   uint16_t tubes[4];
   boolean Process; // Default
   boolean estop;
+  boolean StartTiltTube;
 } Message_Struct;
 
 Message_Struct message_object;
@@ -70,6 +71,9 @@ bool AbortSignal = 0;
 volatile bool RunSignal = 0;
 volatile bool aborted = 0;
 
+bool firstRun = true;
+bool lastRun = true;//assuming you only wnat to do 1 tube at a time, will change later
+
 volatile bool estopSignal = 0; // Received from interrupt, Flag to update in void
 volatile bool estopstatus = 0; // Current E-stop status
 
@@ -77,7 +81,7 @@ uint16_t DisplayTubes[4];
 uint16_t tube_vol_temp = 0;
 int current_tube_num = 0;
 
-hw_timer_t *Display_Vol_Timer_ISR = NULL;
+//hw_timer_t *Display_Vol_Timer_ISR = NULL;
 const unsigned long interval = 20000;  // Interval in milliseconds (20 seconds)
 
 //# ########################################################################
@@ -210,7 +214,8 @@ void setup() {
   
   initializePushButtons();
   initializeInterupts();
-
+//commenting out because it is messing up the pump timer because using the same internal timer one i think
+/*
   // Initialize the timer
   Display_Vol_Timer_ISR = timerBegin(0, 80, true);  // Timer 0, prescaler 80 (1 tick = 1 microsecond), count up
   // Attach the interrupt function to the timer
@@ -220,6 +225,8 @@ void setup() {
   // Enable the timer alarm
   timerAlarmEnable(Display_Vol_Timer_ISR);
   // startTimer();
+*/
+
 }
 
 int count = 0;
@@ -291,7 +298,8 @@ void loop() {
     TiltModule.setAllTubesToAngle(loadingAngle);
 
     RunSignal = 0;
-    performFastFillingMotionForAll4();
+    //performFastFillingMotionForAll4();
+    performFillingMotionforAll4();
     aborted = 0;
 
 
@@ -312,6 +320,10 @@ void loop() {
     }
     AbortSignal = 0;
   }
+  if(digitalRead(homeButton)){
+    Gantry.homeGantry();
+    lockerStorageSequence();
+  }
 }
 
 
@@ -319,7 +331,7 @@ void loop() {
 void performFillingMotionFor1Tube(int tubeNumber){
   Serial.println("Performing performFillingMotionFor1Tube...");
 
-  delayWithAbort_ms(5000); //Delay for 5s
+  //delayWithAbort_ms(5000); //Delay for 5s
 
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
@@ -331,6 +343,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
 
   //only for testing get rid after
+  /*
   delayWithAbort_ms(1000);
 
   Pump.setPumpDirection(false);
@@ -338,6 +351,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   delayWithAbort_ms(3000);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
+  */
 
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
@@ -358,26 +372,30 @@ void performFillingMotionFor1Tube(int tubeNumber){
   int intialHeightAboveAxis = 55000;
   
   //try combining moves int o1 diagonal pass 
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 5000);    
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 0);    
 
-  delayWithAbort_ms(1000);
+  delayWithAbort_ms(0);
 
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
   //FIRST MOVE TUBE 5 degs so there are no collisions then move back
-  TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
+  TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 2, tubeNumber);
+
+  if(firstRun){
+    //initizl pump prime
+    Pump.setPumpRPM(300);
+    delayWithAbort_ms(1900);
+    Pump.setPumpRPM(0);
+    delayWithAbort_ms(1000);
+  }
 
 
   int entranceDistance_um = 63500;
   //slide into tube very slowly as deep as posssible
-  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 5000);
+  Gantry.goToRelativePosition(0, -entranceDistance_um*sin(PI*(firstFillAngle)/float(180)), -entranceDistance_um*cos(PI*(firstFillAngle)/float(180)), 0);
    
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
 
-  //initizl pump prime
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(1900);
-  Pump.setPumpRPM(0);
-  delayWithAbort_ms(1000);
+
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
   Pump.setPumpRPM(10);
@@ -407,19 +425,19 @@ void performFillingMotionFor1Tube(int tubeNumber){
   }
 
   //take the nozzle out by traveling straight up.
-  Gantry.goToRelativePosition(0, 0, 40000, 5000);
+  Gantry.goToRelativePosition(0, 0, 40000, 0);
 
   // straighten out 
   int finalFillAngle = -10;
   TiltModule.sweepTubeToAngle(finalFillAngle, 1, tubeNumber);
 
   //go to center above the tube
-  Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
+  Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
 
   int depthBelowTubeTop_um = 25000;//this is for the depth along the tube wall you want the final fill position to be at.
 
   //take the nozzle to tube wall, old logic
-  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 5000);
+  Gantry.goToRelativePosition(0, -(tubeWidth_mm*1000/2 + sin(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um), -cos(abs(finalFillAngle)*PI/180)*depthBelowTubeTop_um, 0);
 
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
@@ -433,19 +451,21 @@ void performFillingMotionFor1Tube(int tubeNumber){
   volumeSenseModule::performingFinalFill = false;
 
   //go to center above the tube
-  Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
+  Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
 
   //go back to center
   TiltModule.sweepTubeToAngle(0, 2, tubeNumber);
 
   //will need to be changed so it just runs once at the end of filling four tubes
-  delayWithAbort_ms(1000);
+  if(lastRun){
+    delayWithAbort_ms(500);
+    Pump.setPumpDirection(false);
+    Pump.setPumpRPM(300);
+    delayWithAbort_ms(3000);
+    Pump.setPumpRPM(0);
+    Pump.setPumpDirection(true);
+  }
 
-  Pump.setPumpDirection(false);
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(3000);
-  Pump.setPumpRPM(0);
-  Pump.setPumpDirection(true);
 
   delayWithAbort_ms(500);
   Serial.println("0.5 second");
@@ -464,6 +484,16 @@ void performFillingMotionforAll4(){
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
     if (AbortSignal || estopSignal == 1) return;
 
+    if(i == 0){
+      firstRun = true;
+    }else{
+      firstRun = false;
+    }
+    if(i == TiltModule.getNumberOfTubes() - 1){
+      lastRun = true;
+    }else{
+      lastRun = false;
+    }
     performFillingMotionFor1Tube(i+1);
   }
   if (AbortSignal || estopSignal == 1) return;
@@ -709,6 +739,16 @@ void performFastFillingMotionForAll4(){
     //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
     current_tube_num = i+1;
+    if(i == 0){
+      firstRun = true;
+    }else{
+      firstRun = false;
+    }
+    if(i == TiltModule.getNumberOfTubes() - 1){
+      lastRun = true;
+    }else{
+      lastRun = false;
+    }
     performFastFillingMotionFor1Tube(i+1);
     if (AbortSignal || estopSignal == 1) return;
   }
@@ -764,14 +804,18 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
   if (AbortSignal || estopSignal == 1) return;  
+  
   //only for testing get rid after
-  delayWithAbort_ms(1000);
+  /*
+    delayWithAbort_ms(1000);
 
   Pump.setPumpDirection(false);
   Pump.setPumpRPM(300);
   delayWithAbort_ms(1000);
   Pump.setPumpRPM(0);
   Pump.setPumpDirection(true);
+  */
+
 
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
@@ -800,7 +844,14 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
   //FIRST MOVE TUBE 5 degs so there are no collisions then move back
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
-
+  
+  if(firstRun){
+    //initizl pump prime
+    Pump.setPumpRPM(300);
+    delayWithAbort_ms(1900);
+    Pump.setPumpRPM(0);
+    delayWithAbort_ms(1000);
+  }
 
   int entranceDistance_um = 63500;
   //slide into tube very slowly as deep as posssible
@@ -808,11 +859,6 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
    
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
 
-  //initizl pump prime
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(500);
-  Pump.setPumpRPM(0);
-  delayWithAbort_ms(500);
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
   Pump.setPumpRPM(10);
@@ -821,7 +867,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   if (AbortSignal || estopSignal == 1) return;
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
-  startTimer(); //Start Timer AKA generate tube Vol
+  //startTimer(); //Start Timer AKA generate tube Vol
 
   ///find distance to move out of the tube
   //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
@@ -879,14 +925,16 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   //will need to be changed so it just runs once at the end of filling four tubes
   delayWithAbort_ms(000);
   if (AbortSignal || estopSignal == 1) return;
-  Pump.setPumpDirection(false);
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(500);
-  Pump.setPumpRPM(0);
-  Pump.setPumpDirection(true);
 
-  delayWithAbort_ms(500);
-  disableTimer();
+  if(lastRun){
+    Pump.setPumpDirection(false);
+    Pump.setPumpRPM(300);
+    delayWithAbort_ms(2000);
+    Pump.setPumpRPM(0);
+    Pump.setPumpDirection(true);
+    delayWithAbort_ms(500);
+  }
+  //disableTimer();
   Serial.println("0.5 second");
   DisplayTubes[tubeNumber-1] = 100;
   // Call tube vol update func
@@ -904,6 +952,7 @@ void delayWithAbort_ms(int delayTime_ms){
   }  
 }
 
+/*
 // Timer ISR function to send "hello" over Serial
 void IRAM_ATTR Tube_Vol_Timer() {
   if(DisplayTubes[current_tube_num] == 100)
@@ -935,3 +984,4 @@ void startTimer() {
   current_tube_num = 0;
   timerAlarmEnable(Display_Vol_Timer_ISR);
 }
+*/

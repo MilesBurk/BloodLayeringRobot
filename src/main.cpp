@@ -38,7 +38,8 @@ typedef struct Message_Struct {
   uint16_t tubes[4];
   boolean Process; // Default
   boolean estop;
-  boolean StartTiltTube;
+  boolean StartTiltTube; // 0 is nothing/not tilt, 1 is tilt the tube
+  byte CurrentTubeNumESP; // 0 = do nothing, 1 2 3 4 indicates current tube number
 } Message_Struct;
 
 Message_Struct message_object;
@@ -81,6 +82,7 @@ uint16_t DisplayTubes[4];
 uint16_t tube_vol_temp = 0;
 int current_tube_num = 0;
 
+bool StartTiltTubeMain = 0;
 //hw_timer_t *Display_Vol_Timer_ISR = NULL;
 const unsigned long interval = 20000;  // Interval in milliseconds (20 seconds)
 
@@ -121,6 +123,8 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
 
     Serial.print("Process :");
     Serial.println(receivedData->Process);
+
+    StartTiltTubeMain = receivedData->StartTiltTube; // Equal the Tilt Tube boolean
 
     // Run if Run = 1
     if(receivedData->Run == 1)
@@ -225,8 +229,7 @@ void setup() {
   // Enable the timer alarm
   timerAlarmEnable(Display_Vol_Timer_ISR);
   // startTimer();
-*/
-
+*/ 
 }
 
 int count = 0;
@@ -280,6 +283,17 @@ void loop() {
   }
   //
 
+  if(StartTiltTubeMain == 1)
+  {
+    // Call the tilt tube function
+    Serial.println("Jumping to tilt tube function");
+    StartTiltTubeMain = 0;
+    
+    //go to loading angle
+    int loadingAngle = -30;
+    TiltModule.setAllTubesToAngle(loadingAngle);
+  }
+
   if(RunSignal == 1 || digitalRead(runButton))
   { 
     Serial.println("Jumping to Run");
@@ -298,8 +312,8 @@ void loop() {
     TiltModule.setAllTubesToAngle(loadingAngle);
 
     RunSignal = 0;
-    //performFastFillingMotionForAll4();
-    performFillingMotionforAll4();
+    performFastFillingMotionForAll4();
+    // performFillingMotionforAll4();
     aborted = 0;
 
 
@@ -482,8 +496,9 @@ void performFillingMotionFor1Tube(int tubeNumber){
 void performFillingMotionforAll4(){
   //cycle through all 4 motions.
   for(int i = 0; i < TiltModule.getNumberOfTubes(); i++){
-    if (AbortSignal || estopSignal == 1) return;
 
+    if (AbortSignal || estopSignal == 1) return;
+      
     if(i == 0){
       firstRun = true;
     }else{
@@ -498,6 +513,7 @@ void performFillingMotionforAll4(){
   }
   if (AbortSignal || estopSignal == 1) return;
 
+
   //once it is finished then go to top left
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
   // #############################################################################################
@@ -507,6 +523,7 @@ void performFillingMotionforAll4(){
   Serial.println("Sending ESP-NOW Process");
   ESPNOWSendStatBool = 0;
 
+  message_object.StartTiltTube = 0;  // Indicate to stop the filling
   message_object.Process = 1;
   int attempt = 0;
   for (attempt = 0; attempt < 20; attempt++) {
@@ -605,7 +622,8 @@ void EStopEngage()
   message_object.Stop = 0;
   message_object.Abort = 0;
   message_object.Process = 0; 
-
+  message_object.CurrentTubeNumESP = 0;
+  
   int attempt = 0;
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
@@ -641,6 +659,7 @@ void EStopDisengage(){ // Newly Added
   message_object.Stop = 0;
   message_object.Abort = 0;
   message_object.Process = 0; 
+  message_object.CurrentTubeNumESP = 0;
 
   int attempt = 0;
   for (attempt = 0; attempt < 20; attempt++) {
@@ -712,6 +731,10 @@ void ResetTubeVolAndSend()
     DisplayTubes[i] = 0;
   }
   memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes));
+  message_object.StartTiltTube = 0;
+  message_object.CurrentTubeNumESP = 0;
+  message_object.CurrentTubeNumESP = 0; // TubeNumber always start from 
+
   // Send Volume update
   ESPNOWSendStatBool = 0;
   int attempt;  
@@ -764,7 +787,9 @@ void performFastFillingMotionForAll4(){
   Serial.println("Sending ESP-NOW Process");
   ESPNOWSendStatBool = 0;
 
+  message_object.CurrentTubeNumESP = 0; // TubeNumber always start from || 
   message_object.Process = 1;
+
   int attempt = 0;
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
@@ -790,8 +815,8 @@ void performFastFillingMotionForAll4(){
 }
 
 //for testing purposes only
-void performFastFillingMotionFor1Tube(int tubeNumber){
-   Serial.println("Performing performFastFillingMotionFor1Tube...");
+void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
+  Serial.println("Performing : performFastFillingMotionFor1Tube...");
 
   delayWithAbort_ms(1000); //Delay for 5s
 
@@ -868,6 +893,35 @@ void performFastFillingMotionFor1Tube(int tubeNumber){
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
   //startTimer(); //Start Timer AKA generate tube Vol
+
+  // #############################################################################################
+  // Send 
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Sending  !");
+  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
+  ESPNOWSendStatBool = 0;
+
+  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(50); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Fill Tube number sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  // #############################################################################################
 
   ///find distance to move out of the tube
   //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end

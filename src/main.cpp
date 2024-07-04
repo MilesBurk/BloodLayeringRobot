@@ -415,35 +415,6 @@ void performFillingMotionFor1Tube(int tubeNumber){
   Pump.setPumpRPM(10);
   delayWithAbort_ms(30000);
 
-  // #############################################################################################
-  // Send 
-  Serial.println("# ////////////////////////////////////////////////////////////////////");
-  Serial.println("Sending  !");
-  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
-  ESPNOWSendStatBool = 0;
-
-  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
-
-  int attempt = 0;
-  for (attempt = 0; attempt < 20; attempt++) {
-    // Simulate some operation that assigns a value to 'result'
-    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(50); // 1000 = 1s
-    Serial.println();
-    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-    Serial.println();
-    // Check if the result is ESP_OK
-    if (ESPNOWSendStatBool == 1) 
-    {
-      Serial.println("Fill Tube number sent successful, breaking the loop.");
-      ESPNOWSendStatBool = 0;
-      break;
-    }
-  }
-
-  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
-  // #############################################################################################
-
 
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
 
@@ -486,6 +457,36 @@ void performFillingMotionFor1Tube(int tubeNumber){
   volumeSenseModule::performingFinalFill = true;
 
   Serial.println("Reached above the volume line");
+
+  // #############################################################################################
+  // Send 
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Sending  !");
+  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
+  ESPNOWSendStatBool = 0;
+
+  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(50); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Fill Tube number sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  // #############################################################################################
+
   //here you would fill until the volume sensors is triggered.
   while(!volumeSenseModule::timeToStopPump() && !aborted){};
   //basically wait until the pump turns itself off.
@@ -923,35 +924,6 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
   //startTimer(); //Start Timer AKA generate tube Vol
 
-  // #############################################################################################
-  // Send 
-  Serial.println("# ////////////////////////////////////////////////////////////////////");
-  Serial.println("Sending  !");
-  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
-  ESPNOWSendStatBool = 0;
-
-  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
-
-  int attempt = 0;
-  for (attempt = 0; attempt < 20; attempt++) {
-    // Simulate some operation that assigns a value to 'result'
-    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(50); // 1000 = 1s
-    Serial.println();
-    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-    Serial.println();
-    // Check if the result is ESP_OK
-    if (ESPNOWSendStatBool == 1) 
-    {
-      Serial.println("Fill Tube number sent successful, breaking the loop.");
-      ESPNOWSendStatBool = 0;
-      break;
-    }
-  }
-
-  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
-  // #############################################################################################
-
   ///find distance to move out of the tube
   //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
   int exitDistance_um = entranceDistance_um - 11000;
@@ -992,6 +964,36 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   Pump.setPumpRPM(50);
   volumeSenseModule::performingFinalFill = true;
   Serial.println("Reached above the volume line");
+
+  // #############################################################################################
+  // Send 
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Sending  !");
+  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
+  ESPNOWSendStatBool = 0;
+
+  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(50); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Fill Tube number sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  // #############################################################################################
+  
   //here you would fill until the volume sensors is triggered.
   while(!volumeSenseModule::timeToStopPump() && !aborted){};
   //basically wait until the pump turns itself off.

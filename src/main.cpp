@@ -762,7 +762,6 @@ void ResetTubeVolAndSend()
   }
   memcpy(message_object.tubes,DisplayTubes, sizeof(DisplayTubes));
   message_object.StartTiltTube = 0;
-  message_object.CurrentTubeNumESP = 0;
   message_object.CurrentTubeNumESP = 0; // TubeNumber always start from 
 
   // Send Volume update

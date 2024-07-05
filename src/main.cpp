@@ -10,12 +10,13 @@
 #include <WiFi.h>
 //##########################################################
 
+
 #define runButton 27 
 #define homeButton 14
 #define emergencyStopButton 13
 
 #define estoppin 35
-
+#define powerSaverPin 2
 //THIS roughly means the distance you want to nozzle to be at before entrance into the tube at 60 degrees
 #define heightAbovePivot_um 55000
 #define tubeWidth_mm 27
@@ -65,6 +66,7 @@ void EStopUpdateState();
 void IRAM_ATTR Tube_Vol_Timer();
 void disableTimer();
 void startTimer();
+void powerSaverMode(bool powerSaverModeOn);
 
 
 bool ESPNOWSendStatBool ;
@@ -234,6 +236,7 @@ void setup() {
 
 int count = 0;
 void loop() {
+  powerSaverMode(true);//default state is power saver mode
   if(count == 0)
   {
     Serial.println("In First Loop");
@@ -296,6 +299,13 @@ void loop() {
 
   if(RunSignal == 1 || digitalRead(runButton))
   { 
+    //incase we manually press the run button
+    if(digitalRead(runButton)){
+      //go to loading angle
+      int loadingAngle = -30;
+      TiltModule.setAllTubesToAngle(loadingAngle);
+    }
+    powerSaverMode(false);
     Serial.println("Jumping to Run");
 
     //go to upright angle
@@ -335,6 +345,7 @@ void loop() {
     AbortSignal = 0;
   }
   if(digitalRead(homeButton)){
+    powerSaverMode(false);
     Gantry.homeGantry();
     lockerStorageSequence();
   }
@@ -621,6 +632,7 @@ void initializePushButtons(){
   pinMode(homeButton, INPUT);
   pinMode(emergencyStopButton, INPUT);
   pinMode(estoppin, INPUT);
+  pinMode(powerSaverPin, OUTPUT);
 }
 
 void EStopUpdateState() // Newly Added
@@ -1035,6 +1047,14 @@ void delayWithAbort_ms(int delayTime_ms){
       return;
     }
   }  
+}
+void powerSaverMode(bool powerSaverModeOn){
+  if(powerSaverModeOn){
+    digitalWrite(powerSaverPin, HIGH);
+  }
+  else{
+    digitalWrite(powerSaverPin, LOW);
+  }
 }
 
 /*

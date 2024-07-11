@@ -67,6 +67,7 @@ void IRAM_ATTR Tube_Vol_Timer();
 void disableTimer();
 void startTimer();
 void powerSaverMode(bool powerSaverModeOn);
+void runEStopRoutine();
 
 
 bool ESPNOWSendStatBool ;
@@ -145,7 +146,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     {
       Serial.println("Received Abort command");
       AbortSignal = 1;
-      // stopAllMotors();
+      //stopAllMotors();
     }
     else
     {
@@ -274,16 +275,14 @@ void loop() {
     // Engage estop
     estopstatus = 1;
     AbortSignal = 1;
-    EStopEngage();
-    ResetTubeVolAndSend();
-    stopAllMotors();
+    runEStopRoutine();
   }
-  else if(estopSignal == 0 && estopstatus == 1)
-  {
-    // Disengage estop
-    EStopDisengage();
-    estopstatus = 0;
-  }
+  // else if(estopSignal == 0 && estopstatus == 1)
+  // {
+  //   // Disengage estop
+  //   EStopDisengage();
+  //   estopstatus = 0;
+  // }
   //
 
   if(StartTiltTubeMain == 1)
@@ -317,9 +316,12 @@ void loop() {
     delay(1000);
     Gantry.homeGantry();
     
-    //go to loading angle
+    //don't need to go to loading angle again because we had already gone to the loading angle in a seperate UI screen
+    /*
     int loadingAngle = -30;
     TiltModule.setAllTubesToAngle(loadingAngle);
+
+    */
 
     RunSignal = 0;
     performFastFillingMotionForAll4();
@@ -327,13 +329,13 @@ void loop() {
     aborted = 0;
 
 
-    if(AbortSignal == 1 || estopSignal == 1)
+    if(AbortSignal == 1 || (estopSignal == 1 && estopstatus == 0))
     {
       Serial.println("Aborted/Estop Signal received in void loop");
-      if(estopSignal == 1)
+      if(estopSignal == 1 && estopstatus == 0)
       {
         estopstatus = 1;
-        EStopEngage();
+        runEStopRoutine();
       }
       ResetTubeVolAndSend();
       stopAllMotors();
@@ -381,7 +383,8 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
-  delayWithAbort_ms(1000);
+  //tube should already be in 0 degree position, but re-assign to ensure it is straight
+  //delayWithAbort_ms(1000);
 
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
@@ -396,8 +399,10 @@ void performFillingMotionFor1Tube(int tubeNumber){
   //note I found that 55000 also works with less bending, can likely still be improved. note that a lower number will make nozzle bend less, i.e lift it up
   int intialHeightAboveAxis = 55000;
   
-  //try combining moves int o1 diagonal pass 
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 0);    
+  //try combining moves into 1 diagonal pass
+  int yDisplacement_um = 10000; 
+  Gantry.goToRelativePosition(0, yDisplacement_um, 0, 0);    
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180))-yDisplacement_um, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 0);    
 
   delayWithAbort_ms(0);
 
@@ -637,17 +642,7 @@ void initializePushButtons(){
 
 void EStopUpdateState() // Newly Added
 { 
-  if(digitalRead(estoppin))
-  {
-    // When High
     estopSignal = 1;
-    Serial.println("E-Stop State changed to Engaged!");
-  }
-  else{
-    // When Low
-    estopSignal = 0;
-    Serial.println("E-Stop State changed to disengaged!");
-  }
 }
 
 void EStopEngage()
@@ -671,7 +666,7 @@ void EStopEngage()
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(500); // 1000 = 1s
+    //delay(500); // 1000 = 1s
     Serial.println();
     Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
     Serial.println();
@@ -685,12 +680,14 @@ void EStopEngage()
   }
 
   if (attempt == 21) {Serial.println("Max attempts on sending E-Stop engaged reached without success.");}
-  ResetTubeVolAndSend();
+  //ResetTubeVolAndSend();//tube volume is reset in the main loop
 }
 
 void EStopDisengage(){ // Newly Added
   // #############################################################################################
   // Send estop = 1
+  estopSignal = 0;
+  estopstatus = 0;
   Serial.println("# ////////////////////////////////////////////////////////////////////");
   Serial.println("E-Stop disengaged!!");
   Serial.println("Sending ESP-NOW Process");
@@ -708,7 +705,7 @@ void EStopDisengage(){ // Newly Added
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(500); // 1000 = 1s
+    //delay(500); // 1000 = 1s
     Serial.println();
     Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
     Serial.println();
@@ -722,14 +719,15 @@ void EStopDisengage(){ // Newly Added
   }
 
   if (attempt == 21) {Serial.println("Max attempts on sending E-Stop disengaged reached without success.");}
-  ResetTubeVolAndSend();
+  //ResetTubeVolAndSend();
 }
 
 void initializeInterupts(){
   //Add external interupt for emergency stop button  
   attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
 
-  attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, CHANGE); // Called When EStop has a changing state
+  //attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, CHANGE); // Called When EStop has a changing state
+  attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, FALLING);
 
   //Interupt for pump control
   timerAttachInterrupt(Pump.timer, peristalticPump::onTimer, true); 	// Attach interrupt for pump
@@ -783,7 +781,7 @@ void ResetTubeVolAndSend()
   for (attempt = 0; attempt < 20; attempt++) {
       // Simulate some operation that assigns a value to 'result'
       esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-      delay(500); // 1000 = 1s
+      //delay(500); // 1000 = 1s
       Serial.println();
       Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
       Serial.println();
@@ -887,7 +885,8 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
-  delayWithAbort_ms(1000);
+  //tube should already be in 0 degree position, but re-assign to ensure it is straight
+  //delayWithAbort_ms(1000);
 
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
@@ -903,9 +902,11 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   int intialHeightAboveAxis = 55000;
 
   if (AbortSignal || estopSignal == 1) return;
-  //try combining moves int o1 diagonal pass 
-  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180)), heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 000);    
 
+  //try combining moves int o1 diagonal pass 
+  int yDisplacement_um = 10000; 
+  Gantry.goToRelativePosition(0, yDisplacement_um, 0, 0);    
+  Gantry.goToRelativePosition(0, heightAbovePivot_um*sin(PI*firstFillAngle/float(180))-yDisplacement_um, heightAbovePivot_um*cos(PI*firstFillAngle/float(180)) - intialHeightAboveAxis - zOffsetForBottomOfTube, 0);
   delayWithAbort_ms(1000);
 
   int TUBE_ANGLE_OFFSET_FOR_INSERTION = 15;
@@ -1090,3 +1091,14 @@ void startTimer() {
   timerAlarmEnable(Display_Vol_Timer_ISR);
 }
 */
+
+void runEStopRoutine(){
+    EStopEngage();//display the E-stop message
+    stopAllMotors();
+    delay(50);//debounce
+    //wait until the e-stop is un-pressed
+    while(!digitalRead(estoppin));
+    delay(50);//debounce time
+    EStopDisengage();
+    ResetTubeVolAndSend();
+}

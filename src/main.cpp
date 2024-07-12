@@ -425,6 +425,36 @@ void performFillingMotionFor1Tube(int tubeNumber){
    
   TiltModule.sweepTubeToAngle(firstFillAngle, 1, tubeNumber);
 
+  //add the UI filling sequence
+  // #############################################################################################
+  // Send 
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Sending  !");
+  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
+  ESPNOWSendStatBool = 0;
+
+  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(50); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Fill Tube number sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  // #############################################################################################
+
 
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
@@ -474,35 +504,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   Serial.println("Reached above the volume line");
 
-  // #############################################################################################
-  // Send 
-  Serial.println("# ////////////////////////////////////////////////////////////////////");
-  Serial.println("Sending  !");
-  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
-  ESPNOWSendStatBool = 0;
-
-  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
-
-  int attempt = 0;
-  for (attempt = 0; attempt < 20; attempt++) {
-    // Simulate some operation that assigns a value to 'result'
-    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    delay(50); // 1000 = 1s
-    Serial.println();
-    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-    Serial.println();
-    // Check if the result is ESP_OK
-    if (ESPNOWSendStatBool == 1) 
-    {
-      Serial.println("Fill Tube number sent successful, breaking the loop.");
-      ESPNOWSendStatBool = 0;
-      break;
-    }
-  }
-
-  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
-  // #############################################################################################
-
+  
   //here you would fill until the volume sensors is triggered.
   while(!volumeSenseModule::timeToStopPump() && !aborted){};
   //basically wait until the pump turns itself off.
@@ -929,6 +931,35 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
+    //add the UI filling sequence
+  // #############################################################################################
+  // Send 
+  Serial.println("# ////////////////////////////////////////////////////////////////////");
+  Serial.println("Sending  !");
+  Serial.println("Sending ESP-NOW Tube Fill Tube Number");
+  ESPNOWSendStatBool = 0;
+
+  message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
+
+  int attempt = 0;
+  for (attempt = 0; attempt < 20; attempt++) {
+    // Simulate some operation that assigns a value to 'result'
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
+    delay(50); // 1000 = 1s
+    Serial.println();
+    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    Serial.println();
+    // Check if the result is ESP_OK
+    if (ESPNOWSendStatBool == 1) 
+    {
+      Serial.println("Fill Tube number sent successful, breaking the loop.");
+      ESPNOWSendStatBool = 0;
+      break;
+    }
+  }
+
+  if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
+  // #############################################################################################
   Pump.setPumpRPM(10);
   delayWithAbort_ms(1000);
 

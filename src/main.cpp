@@ -169,14 +169,6 @@ servoTiltModule TiltModule = servoTiltModule();
 gantry Gantry = gantry();
 int startingZ_mm  = Gantry.getMaxZDisplacement() - 50;
 
-// void initializePushButtons();
-// void initializeInterupts();
-// void stopAllMotors();
-// void performFillingMotionforAll4();
-// void performFillingMotionFor1Tube(int tubeNumber);
-// void lockerStorageSequence();
-
-
 void setup() {
   //# ########################################################################
   // Set device as a Wi-Fi Station (FOR ESP NOW)
@@ -212,7 +204,6 @@ void setup() {
   AbortSignal = 0; //Default is 0, 0 means normal, 1 means Abort sending Process
   
   ResetTubeVolAndSend();
-  //# ########################################################################
 
   //Initialize tilt module pwm
   TiltModule.pwm = Adafruit_PWMServoDriver(); // Uncomment if needed
@@ -221,18 +212,6 @@ void setup() {
   
   initializePushButtons();
   initializeInterupts();
-//commenting out because it is messing up the pump timer because using the same internal timer one i think
-/*
-  // Initialize the timer
-  Display_Vol_Timer_ISR = timerBegin(0, 80, true);  // Timer 0, prescaler 80 (1 tick = 1 microsecond), count up
-  // Attach the interrupt function to the timer
-  timerAttachInterrupt(Display_Vol_Timer_ISR, &Tube_Vol_Timer, true);
-  // Set the alarm to trigger every 'interval' microseconds
-  timerAlarmWrite(Display_Vol_Timer_ISR, interval * 1000, true);
-  // Enable the timer alarm
-  timerAlarmEnable(Display_Vol_Timer_ISR);
-  // startTimer();
-*/ 
 }
 
 int count = 0;
@@ -244,30 +223,6 @@ void loop() {
     count++;
   }
 
-  // //Perform homing sequence and tilt tube holders to initial angles
-  // if(digitalRead(homeButton) == HIGH){ // Uncomment if needed
-  //   //go to upright angle
-  //   TiltModule.setAllTubesToAngle(0);
-  //   delay(1000);
-  //   Gantry.homeGantry();
-  //   //go to loading angle
-  //   int loadingAngle = -30;
-  //   TiltModule.setAllTubesToAngle(loadingAngle);
-  // }
-
-  // //Perform one of the filling sequences
-  // if (digitalRead(runButton) == HIGH) // Uncomment if needed
-  // {
-
-  //   //performFillingMotionforAll4(); 
-  //   //lockerStorageSequence(); 
-
-  //   //ONLY TEST WITH FIRST TUBE, OTHER VOLUYME SENSORES ARE NOT YET CONNECTED
-  //   performFillingMotionFor1Tube(2);
-  // }
-  // Serial.println("AbortSignal : ");
-  // Serial.println(AbortSignal);
-
   // E-stop Flag Check
   if(estopSignal == 1 && estopstatus == 0)
   {
@@ -277,13 +232,6 @@ void loop() {
     AbortSignal = 1;
     runEStopRoutine();
   }
-  // else if(estopSignal == 0 && estopstatus == 1)
-  // {
-  //   // Disengage estop
-  //   EStopDisengage();
-  //   estopstatus = 0;
-  // }
-  //
 
   if(StartTiltTubeMain == 1)
   {
@@ -310,7 +258,6 @@ void loop() {
     Serial.println("Jumping to Run");
 
     //go to upright angle
-    // AbortSignal = 0;
     aborted = 0;
     Pump.isForcedStop = false;
     TiltModule.isForcedStop = false;
@@ -320,13 +267,6 @@ void loop() {
       Gantry.homeGantry();
     }
     
-    //don't need to go to loading angle again because we had already gone to the loading angle in a seperate UI screen
-    /*
-    int loadingAngle = -30;
-    TiltModule.setAllTubesToAngle(loadingAngle);
-
-    */
-
     RunSignal = 0;
     performFastFillingMotionForAll4();
     // performFillingMotionforAll4();
@@ -364,8 +304,6 @@ void loop() {
 void performFillingMotionFor1Tube(int tubeNumber){
   Serial.println("Performing performFillingMotionFor1Tube...");
 
-  //delayWithAbort_ms(5000); //Delay for 5s
-
   //Make sure that the user is calling a valid tube 
   if (tubeNumber > 4 || tubeNumber < 1){
     return;
@@ -374,18 +312,6 @@ void performFillingMotionFor1Tube(int tubeNumber){
   volumeSenseModule::performingFinalFill = false;
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
-
-  //only for testing get rid after
-  /*
-  delayWithAbort_ms(1000);
-
-  Pump.setPumpDirection(false);
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(3000);
-  Pump.setPumpRPM(0);
-  Pump.setPumpDirection(true);
-  */
-
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
@@ -570,7 +496,6 @@ void performFillingMotionforAll4(){
 
   //once it is finished then go to top left
   Gantry.goToAbsPosition_mm(0, Gantry.getMaxYDisplacement(), Gantry.getMaxZDisplacement(), 10);
-  // #############################################################################################
   // Send ESP-Now Process = 1
   Serial.println("# ////////////////////////////////////////////////////////////////////");
   Serial.println("Tubes Filled !");
@@ -659,7 +584,6 @@ void EStopUpdateState() // Newly Added
 
 void EStopEngage()
 {
-  // #############################################################################################
   // Send estop = 1
   Serial.println("# ////////////////////////////////////////////////////////////////////");
   Serial.println("E-Stop Engaged!!");
@@ -692,11 +616,9 @@ void EStopEngage()
   }
 
   if (attempt == 21) {Serial.println("Max attempts on sending E-Stop engaged reached without success.");}
-  //ResetTubeVolAndSend();//tube volume is reset in the main loop
 }
 
 void EStopDisengage(){ // Newly Added
-  // #############################################################################################
   // Send estop = 1
   estopSignal = 0;
   estopstatus = 0;
@@ -731,14 +653,12 @@ void EStopDisengage(){ // Newly Added
   }
 
   if (attempt == 21) {Serial.println("Max attempts on sending E-Stop disengaged reached without success.");}
-  //ResetTubeVolAndSend();
 }
 
 void initializeInterupts(){
   //Add external interupt for emergency stop button  
   attachInterrupt(digitalPinToInterrupt(emergencyStopButton), stopAllMotors, RISING);
 
-  //attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, CHANGE); // Called When EStop has a changing state
   attachInterrupt(digitalPinToInterrupt(estoppin), EStopUpdateState, FALLING);
 
   //Interupt for pump control
@@ -863,7 +783,6 @@ void performFastFillingMotionForAll4(){
 
   if (attempt == 21) {Serial.println("Max attempts on sending Process confirm reached without success.");}
   ResetTubeVolAndSend();
-  // #############################################################################################
 }
 
 //for testing purposes only
@@ -881,19 +800,6 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   VolumeSensors.currentTubeBeingFilled = tubeNumber;
   int startingXPosition_mm = TiltModule.getAbsoluteStartingXPositionOfTube(startingX_mm, tubeNumber);
   if (AbortSignal || estopSignal == 1) return;  
-  
-  //only for testing get rid after
-  /*
-    delayWithAbort_ms(1000);
-
-  Pump.setPumpDirection(false);
-  Pump.setPumpRPM(300);
-  delayWithAbort_ms(1000);
-  Pump.setPumpRPM(0);
-  Pump.setPumpDirection(true);
-  */
-
-
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
@@ -941,7 +847,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
 
   //ADD CODE HERE TO DO INITIAL FILLING WHILE THE TUBE IS FULLY IN.
-    //add the UI filling sequence
+  //add the UI filling sequence
   // #############################################################################################
   // Send 
   Serial.println("# ////////////////////////////////////////////////////////////////////");
@@ -975,8 +881,6 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
   if (AbortSignal || estopSignal == 1) return;
   //ONCE THE BLOOD HAS REACHED WHERE THE NOZZLE IS THE CONTINUE TO NEXT SECTION.
-
-  //startTimer(); //Start Timer AKA generate tube Vol
 
   ///find distance to move out of the tube
   //this is the diagonal distance out of the tube you with to travel, I assume it is just 1cm shy of where you started so as to ensure you are in the tube at the end
@@ -1090,6 +994,7 @@ void delayWithAbort_ms(int delayTime_ms){
     }
   }  
 }
+
 void powerSaverMode(bool powerSaverModeOn){
   if(powerSaverModeOn){
     digitalWrite(powerSaverPin, HIGH);
@@ -1098,40 +1003,6 @@ void powerSaverMode(bool powerSaverModeOn){
     digitalWrite(powerSaverPin, LOW);
   }
 }
-
-/*
-// Timer ISR function to send "hello" over Serial
-void IRAM_ATTR Tube_Vol_Timer() {
-  if(DisplayTubes[current_tube_num] == 100)
-  {
-    Serial.println("Already reached 100, turning off Timer");
-    disableTimer();
-  }
-  else
-  {
-    DisplayTubes[current_tube_num]++;
-  }
-  Serial.print("Value of current tube : ");
-  Serial.println(DisplayTubes[current_tube_num]);
-  AdjustTubeValueAndSend();
-  Serial.println("# ########################################");
-}
-
-void disableTimer() {
-  // Disable the timer alarm
-  Serial.print("# ########################################");
-  Serial.println('Timer Stopped');
-  timerAlarmDisable(Display_Vol_Timer_ISR);
-}
-
-void startTimer() {
-  // Enable the timer alarm
-  Serial.print("# ########################################");
-  Serial.println('Timer Started');
-  current_tube_num = 0;
-  timerAlarmEnable(Display_Vol_Timer_ISR);
-}
-*/
 
 void runEStopRoutine(){
     EStopEngage();//display the E-stop message

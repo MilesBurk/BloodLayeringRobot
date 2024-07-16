@@ -146,7 +146,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     {
       Serial.println("Received Abort command");
       AbortSignal = 1;
-      //stopAllMotors();
+      stopAllMotors();
     }
     else
     {
@@ -293,6 +293,7 @@ void loop() {
     
     //go to loading angle
     int loadingAngle = -30;
+    TiltModule.isForcedStop = false;
     TiltModule.setAllTubesToAngle(loadingAngle);
   }
 
@@ -302,6 +303,7 @@ void loop() {
     if(digitalRead(runButton)){
       //go to loading angle
       int loadingAngle = -30;
+      TiltModule.isForcedStop = false;
       TiltModule.setAllTubesToAngle(loadingAngle);
     }
     powerSaverMode(false);
@@ -314,7 +316,9 @@ void loop() {
     TiltModule.isForcedStop = false;
     TiltModule.setAllTubesToAngle(0);
     delay(1000);
-    Gantry.homeGantry();
+    if(!Gantry.isGantryHomed()){
+      Gantry.homeGantry();
+    }
     
     //don't need to go to loading angle again because we had already gone to the loading angle in a seperate UI screen
     /*
@@ -348,8 +352,10 @@ void loop() {
   }
   if(digitalRead(homeButton)){
     powerSaverMode(false);
-    Gantry.homeGantry();
-    lockerStorageSequence();
+    if(!Gantry.isGantryHomed()){
+      Gantry.homeGantry();
+    }
+        lockerStorageSequence();
   }
 }
 
@@ -599,15 +605,16 @@ void performFillingMotionforAll4(){
 }
 
 void stopAllMotors(){
-  Serial.println("# ////////////////////////////////////////////////////////////////////");
-  Serial.print("In stopAllMotors");
+  //Serial.println("# ////////////////////////////////////////////////////////////////////");
+  //Serial.print("In stopAllMotors");
   Gantry.emergencyStop();
   Pump.stopPump(); 
   aborted = 1;
   Pump.isForcedStop = true;
   TiltModule.isForcedStop = true;
 
-  Serial.println("Motors stopped");
+/*
+  //Serial.println("Motors stopped");
   message_object.Process = 0;
   ESPNOWSendStatBool = 0;
   
@@ -617,19 +624,21 @@ void stopAllMotors(){
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
     //delay(800); // 1000 = 1s
-    Serial.println();
-    Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-    Serial.println();
+    //Serial.println();
+    //Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
+    //Serial.println();
     // Check if the result is ESP_OK
     if (ESPNOWSendStatBool == 1) 
       {
-        Serial.println("Abort/Stop Motor Confirm, breaking the loop.");
+        //Serial.println("Abort/Stop Motor Confirm, breaking the loop.");
         ESPNOWSendStatBool = 0;
         break;
       }
   }
 
-  if (attempt == 21) {Serial.println("Max attempts on sending Abort/Stop Motor Confirm reached without success.");}
+  //if (attempt == 21) {Serial.println("Max attempts on sending Abort/Stop Motor Confirm reached without success.");}
+*/
+
   AbortSignal = 0;
 }
 
@@ -645,6 +654,7 @@ void initializePushButtons(){
 void EStopUpdateState() // Newly Added
 { 
     estopSignal = 1;
+    stopAllMotors();
 }
 
 void EStopEngage()
@@ -1018,7 +1028,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
 
   message_object.CurrentTubeNumESP = tubeNumber; // TubeNumber always start from || 
 
-  int attempt = 0;
+  //int attempt = 0;
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
@@ -1125,7 +1135,7 @@ void startTimer() {
 
 void runEStopRoutine(){
     EStopEngage();//display the E-stop message
-    stopAllMotors();
+    //stopAllMotors();
     delay(50);//debounce
     //wait until the e-stop is un-pressed
     while(!digitalRead(estoppin));

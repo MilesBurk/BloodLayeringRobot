@@ -14,6 +14,7 @@ class peristalticPump{
         static void stopPump();
         hw_timer_t *timer = NULL;      //H/W timer defining (Pointer to the Structure)
         static volatile bool isPumpOn;
+        static volatile bool isForcedStop;
 
 
     private:

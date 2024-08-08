@@ -4,6 +4,8 @@
 volatile bool peristalticPump::pumpDirection = true;
 volatile bool peristalticPump::pinState = false;
 volatile bool peristalticPump::isPumpOn = false;
+volatile bool peristalticPump::isForcedStop = false;
+
 
 peristalticPump::peristalticPump(){
     pumpDirection = true;//true is forward false is backwards
@@ -32,7 +34,7 @@ void peristalticPump::setPumpDirection(bool dir){
 }
 
 void peristalticPump::onTimer(){
-  if(isPumpOn){
+  if(isPumpOn && !isForcedStop){
     pinState = !pinState;
     digitalWrite(pumpPin, -pinState);
   }

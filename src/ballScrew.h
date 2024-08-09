@@ -3,28 +3,15 @@
 
 class ballScrew {
   public:
-
     //used for gantry implementation
     unsigned long prevTime;
     bool timeToStep = false;
-
-
-    //
-    //
-    //bool positiveDirection = true;//make this a private variable, don't want to be able to cahnge it, maybe even make it const for testing purposes
-    //CONSIDER USING VARIABLE FOR FORWARD DIRECTION so then can just toggle it and don't need to look at all the true false and not sure what it is, either it gets closer or farther 
-    //  
-
-
-    //static volatile unsigned long prevInteruptTime;// = 0; NOTE THIS MUST BE SET TO 0 AT THE BEGENING OF CODE BEFORE HOMING or could just set in the homing function.
     static volatile bool switchTriggered;
-    //static bool switchTriggered;
 
     ballScrew();
     ballScrew(int limitSwitchPin, int stepPinNumber, int directionPinNumber, int stepsPerRevolutions, int pitchMm, int maxSpeed,  int maxDis_um,  bool positiveDir, bool isHomingDirPositive, bool isHomeZero);
     void initializeMotorPins();
     void setStepDelays(unsigned long totalTime_us);
-    //NOTE I DONT KNOW if ISR WILL BE LINKED TO INITIAL OBJ OR ARRAY OBJ so maybe leave as function to set and then can call when ready
     void homingBallScrew();
     void setHomePosition();
     void runMotor(int completionTime_ms);
@@ -67,7 +54,6 @@ class ballScrew {
     int delay_us = 0;
     bool forcedStop = false;
     
-    //bool positiveDirection;//INDICATE WHICH DIRECTION IS POSITIVE
     bool isHomingDirectionPositive;
     bool isHomingSideZero;
 

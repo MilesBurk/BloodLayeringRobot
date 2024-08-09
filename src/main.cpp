@@ -8,8 +8,6 @@
 //For ESP NOW
 #include <esp_now.h>
 #include <WiFi.h>
-//##########################################################
-
 
 #define runButton 27 
 #define homeButton 14
@@ -25,7 +23,6 @@
 #define startingX_mm 0
 #define startingY_mm 63
 
-//# ########################################################################
 //# ##############ESP-NOW Declaration#######################################
 uint8_t broadcastAddress[] = {0xEC,0xDA,0x3B,0x8D,0x2A,0x04};// REPLACE WITH OTHER TRANSCEIVER MAC ADDRESS
 
@@ -86,7 +83,6 @@ uint16_t tube_vol_temp = 0;
 int current_tube_num = 0;
 
 bool StartTiltTubeMain = 0;
-//hw_timer_t *Display_Vol_Timer_ISR = NULL;
 const unsigned long interval = 20000;  // Interval in milliseconds (20 seconds)
 
 //# ########################################################################
@@ -108,15 +104,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   if (len == sizeof(Message_Struct)) {
     // Cast the received data pointer to Message_Struct
     Message_Struct *receivedData = (Message_Struct *)incomingData;
-
-    // Set AbortSignal based on received Abort value
-    // AbortSignal = receivedData->Abort;
-
-    // // Extract the received boolean values
-    // boolean Run = receivedData->Run;
-    // boolean Home = receivedData->Home;
-    // boolean Stop = receivedData->Stop;
-    // boolean Abort = receivedData->Abort; 
 
     Serial.print("Run :");
     Serial.println(receivedData->Run);
@@ -159,8 +146,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   }
 }
 
-//# ########################################################################
-//# ########################################################################
 
 volumeSenseModule VolumeSensors = volumeSenseModule();
 peristalticPump Pump = peristalticPump();
@@ -170,7 +155,6 @@ gantry Gantry = gantry();
 int startingZ_mm  = Gantry.getMaxZDisplacement() - 50;
 
 void setup() {
-  //# ########################################################################
   // Set device as a Wi-Fi Station (FOR ESP NOW)
   // Init Serial Monitor
  	Serial.begin(115200);
@@ -315,9 +299,6 @@ void performFillingMotionFor1Tube(int tubeNumber){
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
 
-  //tube should already be in 0 degree position, but re-assign to ensure it is straight
-  //delayWithAbort_ms(1000);
-
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 5);
 
@@ -343,7 +324,7 @@ void performFillingMotionFor1Tube(int tubeNumber){
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 2, tubeNumber);
 
   if(firstRun){
-    //initizl pump prime
+    //initiate pump prime
     Pump.setPumpRPM(300);
     delayWithAbort_ms(1900);
     Pump.setPumpRPM(0);
@@ -530,40 +511,11 @@ void performFillingMotionforAll4(){
 }
 
 void stopAllMotors(){
-  //Serial.println("# ////////////////////////////////////////////////////////////////////");
-  //Serial.print("In stopAllMotors");
   Gantry.emergencyStop();
   Pump.stopPump(); 
   aborted = 1;
   Pump.isForcedStop = true;
   TiltModule.isForcedStop = true;
-
-/*
-  //Serial.println("Motors stopped");
-  message_object.Process = 0;
-  ESPNOWSendStatBool = 0;
-  
-  int attempt = 0;
-  for (attempt = 0; attempt < 20; attempt++) 
-  {
-    // Simulate some operation that assigns a value to 'result'
-    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    //delay(800); // 1000 = 1s
-    //Serial.println();
-    //Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
-    //Serial.println();
-    // Check if the result is ESP_OK
-    if (ESPNOWSendStatBool == 1) 
-      {
-        //Serial.println("Abort/Stop Motor Confirm, breaking the loop.");
-        ESPNOWSendStatBool = 0;
-        break;
-      }
-  }
-
-  //if (attempt == 21) {Serial.println("Max attempts on sending Abort/Stop Motor Confirm reached without success.");}
-*/
-
   AbortSignal = 0;
 }
 
@@ -639,7 +591,6 @@ void EStopDisengage(){ // Newly Added
   for (attempt = 0; attempt < 20; attempt++) {
     // Simulate some operation that assigns a value to 'result'
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &message_object, sizeof(message_object));
-    //delay(500); // 1000 = 1s
     Serial.println();
     Serial.printf("Attempt %d: Result = %d\n", attempt + 1, result);
     Serial.println();
@@ -785,7 +736,7 @@ void performFastFillingMotionForAll4(){
   ResetTubeVolAndSend();
 }
 
-//for testing purposes only
+//for testing purposes only to see motion profile!
 void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   Serial.println("Performing : performFastFillingMotionFor1Tube...");
 
@@ -802,9 +753,6 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   if (AbortSignal || estopSignal == 1) return;  
 
   TiltModule.goDirectlyToTubeAngle(0, tubeNumber);
-
-  //tube should already be in 0 degree position, but re-assign to ensure it is straight
-  //delayWithAbort_ms(1000);
 
   //go to center above the tube.
   Gantry.goToAbsPosition_mm(startingXPosition_mm, startingY_mm, startingZ_mm, 0);
@@ -832,7 +780,7 @@ void performFastFillingMotionFor1Tube(int tubeNumber){ // Using this for testing
   TiltModule.sweepTubeToAngle(firstFillAngle + TUBE_ANGLE_OFFSET_FOR_INSERTION, 1, tubeNumber);
   
   if(firstRun){
-    //initizl pump prime
+    //initialize pump prime
     Pump.setPumpRPM(300);
     delayWithAbort_ms(1900);
     Pump.setPumpRPM(0);
@@ -1006,7 +954,6 @@ void powerSaverMode(bool powerSaverModeOn){
 
 void runEStopRoutine(){
     EStopEngage();//display the E-stop message
-    //stopAllMotors();
     delay(50);//debounce
     //wait until the e-stop is un-pressed
     while(!digitalRead(estoppin));

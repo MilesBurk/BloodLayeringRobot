@@ -48,8 +48,6 @@ class gantry{
     bool isHomed = false;
     bool isEmergencyStopped = false;
 
-    //void emergencyStop();
-
     bool allStepsDone();
     void checkAndTakeStep();
     void setStepDelays(unsigned long totalTime_us);

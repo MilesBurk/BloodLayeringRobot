@@ -21,7 +21,6 @@ peristalticPump::peristalticPump(){
     //note that this may be required to have in main not sure
     //Initialize internal timer interupt used to control pump rpm
     timer = timerBegin(0, 80, true);           	// timer 0, prescalar: 80, UP counting
-    //timerAttachInterrupt(timer, &onTimer, true); 	// Attach interrupt
     timerAlarmWrite(timer, 1000000, true);  		// Match value= 1000000 for 1 sec. delay.
     timerAlarmEnable(timer);           			// Enable Timer with interrupt (Alarm Enable)
 }
